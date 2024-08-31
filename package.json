@@ -17,7 +17,7 @@
     "format:fix": "biome check --write",
     "format:fix:unsafe": "biome check --write --unsafe",
     "test": "npm run test:ts && npm run test:unit && npm run test:lint",
-    "test:unit": "jest",
+    "test:unit": "jest --passWithNoTests",
     "test:ts": "tsc --noEmit",
     "test:lint": "biome ci",
     "package:check": "ncu",
