@@ -8,9 +8,14 @@ export enum ChainId {
   ethereum = 'ethereum',
   fraxtal = 'fraxtal',
   linea = 'linea',
+  manta = 'manta',
   mantle = 'mantle',
   mode = 'mode',
+  moonbeam = 'moonbeam',
   optimism = 'optimism',
+  polygon = 'polygon',
+  sei = 'sei',
+  zksync = 'zksync',
 }
 
 export const allChainIds: Array<ChainId> = Object.values(ChainId);
