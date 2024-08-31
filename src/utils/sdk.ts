@@ -25,13 +25,10 @@ type EndpointSdk = {
   ) => Promise<Awaited<ReturnType<Sdk[key]>> & SdkContext>;
 };
 
-const getAllSdks = () => allChainIds.flatMap(chain => getSdksForChain(chain));
+export const getAllSdks = () => allChainIds.flatMap(chain => getSdksForChain(chain));
 
 export const getSdksForChain = createCachedFactoryByChainId((chain: ChainId): EndpointSdk[] => {
   const configs = [getSubgraphConfig(chain, SUBGRAPH_TAG)];
-  if (chain === 'arbitrum') {
-    configs.push(getSubgraphConfig(chain, SUBGRAPH_TAG, true));
-  }
 
   return configs
     .map(builder => builder())
@@ -53,8 +50,8 @@ export const getSdksForChain = createCachedFactoryByChainId((chain: ChainId): En
 type SdkWithContext = SdkContext & { sdk: Sdk };
 type SdkConfig = () => SdkWithContext;
 
-function getSubgraphConfig(chain: ChainId, tag: string, isBeta = false): SdkConfig {
-  const subgraph = getSubgraphName(chain, isBeta);
+function getSubgraphConfig(chain: ChainId, tag: string): SdkConfig {
+  const subgraph = getSubgraphName(chain);
   return () => ({
     chain,
     subgraph,
@@ -63,8 +60,8 @@ function getSubgraphConfig(chain: ChainId, tag: string, isBeta = false): SdkConf
   });
 }
 
-function getSubgraphName(chain: ChainId, isBeta = false): string {
-  return `beefy-clm-${chain}${isBeta ? '-beta' : ''}`;
+function getSubgraphName(chain: ChainId): string {
+  return `beefy-balances-${chain}`;
 }
 
 function getSubgraphUrl(name: string, tag: string): string {

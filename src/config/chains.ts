@@ -4,15 +4,13 @@ import { StringEnum } from '../utils/typebox';
 export enum ChainId {
   arbitrum = 'arbitrum',
   base = 'base',
-  optimism = 'optimism',
-  moonbeam = 'moonbeam',
-  linea = 'linea',
-  polygon = 'polygon',
-  zksync = 'zksync',
-  manta = 'manta',
-  mantle = 'mantle',
-  sei = 'sei',
   bsc = 'bsc',
+  ethereum = 'ethereum',
+  fraxtal = 'fraxtal',
+  linea = 'linea',
+  mantle = 'mantle',
+  mode = 'mode',
+  optimism = 'optimism',
 }
 
 export const allChainIds: Array<ChainId> = Object.values(ChainId);
