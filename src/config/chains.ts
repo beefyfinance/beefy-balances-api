@@ -3,9 +3,11 @@ import { StringEnum } from '../utils/typebox';
 
 export enum ChainId {
   arbitrum = 'arbitrum',
+  avalanche = 'avalanche',
   base = 'base',
   bsc = 'bsc',
   ethereum = 'ethereum',
+  fantom = 'fantom',
   fraxtal = 'fraxtal',
   linea = 'linea',
   manta = 'manta',
