@@ -1,0 +1,35 @@
+query VaultSharesBalances(
+  $token_in_1: [Bytes!]!
+  $token_in_2: [String!]!
+  $account_not_in: [String!]!
+  $block: Int
+  $first: Int = 1000
+  $skip: Int = 0
+) {
+  tokens(first: $first, skip: $skip, where: { id_in: $token_in_1 }) {
+    id
+    name
+    decimals
+    symbol
+  }
+  tokenBalances(
+    block: { number: $block }
+    orderBy: id
+    orderDirection: desc
+    first: $first
+    skip: $skip
+    where: {
+      amount_gt: 0
+      token_in: $token_in_2
+      account_not_in: $account_not_in
+    }
+  ) {
+    token {
+      id
+    }
+    account {
+      id
+    }
+    amount
+  }
+}

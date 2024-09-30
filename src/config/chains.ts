@@ -3,7 +3,7 @@ import { StringEnum } from '../utils/typebox';
 
 export enum ChainId {
   arbitrum = 'arbitrum',
-  avalanche = 'avalanche',
+  avax = 'avax',
   base = 'base',
   bsc = 'bsc',
   ethereum = 'ethereum',
@@ -16,6 +16,7 @@ export enum ChainId {
   moonbeam = 'moonbeam',
   optimism = 'optimism',
   polygon = 'polygon',
+  rootstock = 'rootstock',
   sei = 'sei',
   zksync = 'zksync',
 }
