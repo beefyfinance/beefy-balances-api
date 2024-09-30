@@ -112,6 +112,8 @@ const getVaultHolders = async (
       .map(address => address.toLowerCase())
   );
 
+  const excludeHolders = uniq([...strategies, ...tokens]);
+
   const res = (
     await Promise.all(
       getSdksForChain(chainId).map(sdk =>
@@ -121,7 +123,7 @@ const getVaultHolders = async (
               skip,
               first,
               block: Number(block),
-              account_not_in: strategies,
+              account_not_in: excludeHolders,
               token_in_1: tokens,
               token_in_2: tokens,
             }),
