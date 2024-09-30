@@ -50,7 +50,7 @@ export default async function (
         }
 
         const result = await asyncCache.wrap(
-          `vault:${chain}:${vault_id}:holders`,
+          `vault:${chain}:${vault_id}:${block_number}:holders`,
           5 * 60 * 1000,
           async () => await getVaultHolders(chain, vault_id, BigInt(block_number))
         );
