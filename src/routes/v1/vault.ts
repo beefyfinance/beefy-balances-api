@@ -7,7 +7,6 @@ import { addressSchema } from '../../schema/address';
 import { bigintSchema } from '../../schema/bigint';
 import { getAsyncCache } from '../../utils/async-lock';
 import { getSdksForChain, paginate } from '../../utils/sdk';
-//import { getAllSdks, paginate } from '../../utils/sdk';
 import { getBeefyVaultConfig } from '../../vault-breakdown/vault/getBeefyVaultConfig';
 
 export default async function (
