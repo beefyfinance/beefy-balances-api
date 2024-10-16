@@ -9,15 +9,18 @@ export enum ChainId {
   ethereum = 'ethereum',
   fantom = 'fantom',
   fraxtal = 'fraxtal',
+  gnosis = 'gnosis',
   linea = 'linea',
   manta = 'manta',
   mantle = 'mantle',
+  metis = 'metis',
   mode = 'mode',
   moonbeam = 'moonbeam',
   optimism = 'optimism',
   polygon = 'polygon',
   rootstock = 'rootstock',
   sei = 'sei',
+  scroll = 'scroll',
   zksync = 'zksync',
 }
 
