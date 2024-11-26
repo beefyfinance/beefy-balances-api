@@ -1,5 +1,7 @@
 # beefy-balances-api
 
+```
+
 https://balance-api.beefy.finance/api/v1/status
 http://localhost:4000/api/v1/status
 
@@ -9,3 +11,10 @@ http://localhost:4000/api/v1/holders/counts/all
 https://balance-api.beefy.finance/api/v1/vault/base/baseswap-cow-weth-cbbtc/20449610/share-tokens-balances
 http://localhost:4000/api/v1/vault/base/baseswap-cow-weth-cbbtc/20449610/share-tokens-balances
 
+https://balance-api.beefy.finance/api/v1/config/arbitrum/vaults
+http://localhost:4000/api/v1/config/arbitrum/vaults
+
+https://balance-api.beefy.finance/api/v1/config/arbitrum/vaults?include_eol=true
+http://localhost:4000/api/v1/config/arbitrum/vaults?include_eol=true
+
+```

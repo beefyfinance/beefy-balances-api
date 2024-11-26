@@ -7,7 +7,7 @@ import { addressSchema } from '../../schema/address';
 import { bigintSchema } from '../../schema/bigint';
 import { getAsyncCache } from '../../utils/async-lock';
 import { getSdksForChain, paginate } from '../../utils/sdk';
-import { getBeefyVaultConfig } from '../../vault-breakdown/vault/getBeefyVaultConfig';
+import { getBeefyBreakdownableVaultConfig } from '../../vault-breakdown/vault/getBeefyVaultConfig';
 
 export default async function (
   instance: FastifyInstance,
@@ -78,7 +78,9 @@ const getVaultHolders = async (
   block: bigint
 ): Promise<VaultHolders> => {
   // first get the addresses linked to that vault id
-  const configs = await getBeefyVaultConfig(chainId, vault => vault.id.startsWith(vault_id));
+  const configs = await getBeefyBreakdownableVaultConfig(chainId, vault =>
+    vault.id.startsWith(vault_id)
+  );
 
   const tokens = uniq(
     configs

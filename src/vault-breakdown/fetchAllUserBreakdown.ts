@@ -4,7 +4,7 @@ import type { ChainId } from '../config/chains';
 import { getLoggerFor } from '../utils/log';
 import { getVaultBreakdowns } from './breakdown/getVaultBreakdown';
 import type { BeefyVaultBreakdown } from './breakdown/types';
-import { type BeefyVault, getBeefyVaultConfig } from './vault/getBeefyVaultConfig';
+import { type BeefyVault, getBeefyBreakdownableVaultConfig } from './vault/getBeefyVaultConfig';
 import { getTokenBalances } from './vault/getTokenBalances';
 
 const logger = getLoggerFor('vault-breakdown/fetchAllUserBreakdown');
@@ -17,7 +17,7 @@ export const getUserTVLAtBlock = async (
   logger.debug({ msg: 'Fetching user TVL', blockNumber, chainId });
 
   const [allVaultConfigs, investorPositions] = await Promise.all([
-    getBeefyVaultConfig(chainId, vaultFilter),
+    getBeefyBreakdownableVaultConfig(chainId, vaultFilter),
     getTokenBalances(chainId, {
       blockNumber: BigInt(blockNumber),
       minBalance: BigInt(1),

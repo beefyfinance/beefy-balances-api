@@ -23,6 +23,7 @@ export type BeefyVault = {
   boosts: BeefyBoost[];
   pointStructureIds: string[];
   platformId: ApiPlatformId;
+  status: 'active' | 'eol';
 } & (
   | {
       protocol_type: 'beefy_clm_vault';
@@ -170,6 +171,18 @@ export const getBeefyVaultConfig = async (
     getAllConfigs(chain)
   );
   const filteredConfigs = allConfigs.filter(vaultFilter);
+  return filteredConfigs;
+};
+
+export const getBeefyBreakdownableVaultConfig = async (
+  chain: ChainId,
+  vaultFilter: (vault: BeefyVault) => boolean
+): Promise<BeefyVault[]> => {
+  const asyncCache = getAsyncCache();
+  const allConfigs = await asyncCache.wrap(`beefy-vault-config:${chain}`, 5 * 60 * 1000, () =>
+    getAllConfigs(chain)
+  );
+  const filteredConfigs = allConfigs.filter(vaultFilter);
 
   // check for undefined protocol types
   const notFoundProtocols = filteredConfigs.filter(v => !v.protocol_type);
@@ -241,6 +254,7 @@ const getAllConfigs = async (chain: ChainId): Promise<BeefyVault[]> => {
       vault_token_symbol: vault.earnedToken,
       protocol_type,
       platformId: vault.platformId,
+      status: vault.status,
       strategy_address: vault.strategy.toLocaleLowerCase() as Hex,
       undelying_lp_address,
       reward_pools: reward_pools.map(pool => ({
@@ -299,6 +313,7 @@ const getAllConfigs = async (chain: ChainId): Promise<BeefyVault[]> => {
       ...additionalConfig,
       strategy_address: vault.strategy.toLocaleLowerCase() as Hex,
       undelying_lp_address: underlying_lp_address,
+      status: vault.status,
       reward_pools: reward_pools.map(pool => ({
         id: pool.id,
         clm_address: pool.tokenAddress.toLocaleLowerCase() as Hex,
