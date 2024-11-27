@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyPluginOptions } from 'fastify';
 import config from './config';
+import contract from './contract';
 import holders from './holders';
 import status from './status';
 import vault from './vault';
@@ -13,5 +14,6 @@ export default async function (
   instance.register(holders, { prefix: '/holders' });
   instance.register(vault, { prefix: '/vault' });
   instance.register(config, { prefix: '/config' });
+  instance.register(contract, { prefix: '/contract' });
   done();
 }
