@@ -20,4 +20,14 @@ http://localhost:4000/api/v1/config/arbitrum/vaults
 https://balance-api.beefy.finance/api/v1/config/arbitrum/vaults?include_eol=true
 http://localhost:4000/api/v1/config/arbitrum/vaults?include_eol=true
 
+
+https://balance-api.beefy.finance/api/v1/vault/base/baseswap-cow-weth-cbbtc/20449610/bundle-holder-share
+http://localhost:4000/api/v1/vault/base/baseswap-cow-weth-cbbtc/20449610/bundle-holder-share
+
+https://balance-api.beefy.finance/api/v1/vault/arbitrum/camelot-order-weth/279181618/bundle-holder-share
+http://localhost:4000/api/v1/vault/arbitrum/camelot-order-weth/279181618/bundle-holder-share
+https://balance-api.beefy.finance/api/v1/vault/arbitrum/uniswap-cow-arb-usdc-dai-vault/279181618/bundle-holder-share
+http://localhost:4000/api/v1/vault/arbitrum/uniswap-cow-arb-usdc-dai-vault/279181618/bundle-holder-share
+
+
 ```
