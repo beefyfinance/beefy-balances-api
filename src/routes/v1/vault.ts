@@ -1,6 +1,6 @@
 import { type Static, Type } from '@sinclair/typebox';
 import type { FastifyInstance, FastifyPluginOptions, FastifySchema } from 'fastify';
-import { keyBy, uniq } from 'lodash';
+import { groupBy, keyBy, uniq } from 'lodash';
 import type { Hex } from 'viem';
 import { type ChainId, chainIdSchema } from '../../config/chains';
 import { addressSchema } from '../../schema/address';
@@ -310,12 +310,36 @@ const getVaultHoldersAsBaseVaultEquivalent = async (
     const clmManager = config.beefy_clm_manager;
 
     const managerShareHolders = uniq([
-      ...(balancesByContract[clmManager.vault_address.toLowerCase()]?.balances ?? []),
-      ...clmManager.reward_pools.flatMap(
-        pool => balancesByContract[pool.reward_pool_address.toLowerCase()]?.balances ?? []
+      ...(balancesByContract[clmManager.vault_address.toLowerCase()]?.balances ?? []).map(e => ({
+        ...e,
+        hold_details: [
+          {
+            token: clmManager.vault_address,
+            balance: e.balance,
+          },
+        ],
+      })),
+      ...clmManager.reward_pools.flatMap(pool =>
+        (balancesByContract[pool.reward_pool_address.toLowerCase()]?.balances ?? []).map(e => ({
+          ...e,
+          hold_details: [
+            {
+              token: pool.reward_pool_address,
+              balance: e.balance,
+            },
+          ],
+        }))
       ),
-      ...clmManager.boosts.flatMap(
-        boost => balancesByContract[boost.boost_address.toLowerCase()]?.balances ?? []
+      ...clmManager.boosts.flatMap(boost =>
+        (balancesByContract[boost.boost_address.toLowerCase()]?.balances ?? []).map(e => ({
+          ...e,
+          hold_details: [
+            {
+              token: boost.boost_address,
+              balance: e.balance,
+            },
+          ],
+        }))
       ),
     ]);
 
@@ -331,48 +355,107 @@ const getVaultHoldersAsBaseVaultEquivalent = async (
     const vaultTotalSupply = vaultBalances.reduce((acc, curr) => acc + BigInt(curr.balance), 0n);
     const vaultShareHolders = uniq([
       // vault holders
-      ...vaultBalances,
+      ...vaultBalances.map(e => ({
+        ...e,
+        hold_details: [
+          {
+            token: config.vault_address,
+            balance: e.balance,
+          },
+        ],
+      })),
       // vault reward pool holders
-      ...config.reward_pools.flatMap(
-        pool => balancesByContract[pool.reward_pool_address.toLowerCase()]?.balances ?? []
+      ...config.reward_pools.flatMap(pool =>
+        (balancesByContract[pool.reward_pool_address.toLowerCase()]?.balances ?? []).map(e => ({
+          ...e,
+          hold_details: [
+            {
+              token: pool.reward_pool_address,
+              balance: e.balance,
+            },
+          ],
+        }))
       ),
       // vault boost holders
-      ...config.boosts.flatMap(
-        boost => balancesByContract[boost.boost_address.toLowerCase()]?.balances ?? []
+      ...config.boosts.flatMap(boost =>
+        (balancesByContract[boost.boost_address.toLowerCase()]?.balances ?? []).map(e => ({
+          ...e,
+          hold_details: [
+            {
+              token: boost.boost_address,
+              balance: e.balance,
+            },
+          ],
+        }))
       ),
     ]).filter(e => !excludeHolders.includes(e.holder.toLowerCase()));
 
     const vaultManagerHolders = vaultShareHolders.map(e => {
-      console.log({
-        e,
-        vaultManagerShareBalance,
-        vaultTotalSupply,
-        res0: BigInt(e.balance) * vaultManagerShareBalance,
-        res1: (BigInt(e.balance) * vaultManagerShareBalance) / vaultTotalSupply,
-      });
       return {
         ...e,
         balance: (BigInt(e.balance) * vaultManagerShareBalance) / vaultTotalSupply,
       };
     });
 
-    return [...managerShareHolders, ...vaultManagerHolders].filter(
+    const allHoldersBalances = [...managerShareHolders, ...vaultManagerHolders].filter(
       e => e.balance !== '0' && !excludeHolders.includes(e.holder.toLowerCase())
     );
+
+    // now merge the multiple holds into a single hold per holder
+    const balancesPerHolder = groupBy(allHoldersBalances, e => e.holder.toLowerCase());
+    const mergedHolders = Object.entries(balancesPerHolder).map(([holder, balances]) => ({
+      holder,
+      balance: balances.reduce((acc, curr) => acc + BigInt(curr.balance), 0n),
+      hold_details: balances.flatMap(e => e.hold_details),
+    }));
+    return mergedHolders;
   }
 
   // now we need to find out the actual vault balance in terms of the manager's share token
   const managerShareHolders = uniq([
-    ...(balancesByContract[config.vault_address.toLowerCase()]?.balances ?? []),
-    ...config.reward_pools.flatMap(
-      pool => balancesByContract[pool.reward_pool_address.toLowerCase()]?.balances ?? []
+    ...(balancesByContract[config.vault_address.toLowerCase()]?.balances ?? []).map(e => ({
+      ...e,
+      hold_details: [
+        {
+          token: config.vault_address,
+          balance: e.balance,
+        },
+      ],
+    })),
+    ...config.reward_pools.flatMap(pool =>
+      (balancesByContract[pool.reward_pool_address.toLowerCase()]?.balances ?? []).map(e => ({
+        ...e,
+        hold_details: [
+          {
+            token: pool.reward_pool_address,
+            balance: e.balance,
+          },
+        ],
+      }))
     ),
-    ...config.boosts.flatMap(
-      boost => balancesByContract[boost.boost_address.toLowerCase()]?.balances ?? []
+    ...config.boosts.flatMap(boost =>
+      (balancesByContract[boost.boost_address.toLowerCase()]?.balances ?? []).map(e => ({
+        ...e,
+        hold_details: [
+          {
+            token: boost.boost_address,
+            balance: e.balance,
+          },
+        ],
+      }))
     ),
   ]);
 
-  return managerShareHolders.filter(
+  const allHoldersBalances = managerShareHolders.filter(
     e => e.balance !== '0' && !excludeHolders.includes(e.holder.toLowerCase())
   );
+
+  // now merge the multiple holds into a single hold per holder
+  const balancesPerHolder = groupBy(allHoldersBalances, e => e.holder.toLowerCase());
+  const mergedHolders = Object.entries(balancesPerHolder).map(([holder, balances]) => ({
+    holder,
+    balance: balances.reduce((acc, curr) => acc + BigInt(curr.balance), 0n),
+    hold_details: balances.flatMap(e => e.hold_details),
+  }));
+  return mergedHolders;
 };
