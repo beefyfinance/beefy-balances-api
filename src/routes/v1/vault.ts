@@ -3,15 +3,11 @@ import type { FastifyInstance, FastifyPluginOptions, FastifySchema } from 'fasti
 import { keyBy, uniq } from 'lodash';
 import type { Hex } from 'viem';
 import { type ChainId, chainIdSchema } from '../../config/chains';
-import { TokenBalance } from '../../queries/codegen/sdk';
 import { addressSchema } from '../../schema/address';
 import { bigintSchema } from '../../schema/bigint';
 import { getAsyncCache } from '../../utils/async-lock';
 import { getSdksForChain, paginate } from '../../utils/sdk';
-import {
-  getBeefyBreakdownableVaultConfig,
-  getBeefyVaultConfig,
-} from '../../vault-breakdown/vault/getBeefyVaultConfig';
+import { getBeefyBreakdownableVaultConfig } from '../../vault-breakdown/vault/getBeefyVaultConfig';
 
 export default async function (
   instance: FastifyInstance,
