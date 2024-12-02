@@ -55,5 +55,65 @@ export default async function (
     );
   }
 
+  // all configs with point structure id of some chain
+  {
+    const urlParamsSchema = Type.Object({
+      chain: chainIdSchema,
+    });
+    type UrlParams = Static<typeof urlParamsSchema>;
+    const responseSchema = Type.Object({
+      vaults: Type.Array(Type.Any()),
+    });
+
+    const queryParamsSchema = Type.Object({
+      include_eol: Type.Optional(Type.Boolean({ default: false })),
+    });
+    type QueryParams = Static<typeof queryParamsSchema>;
+
+    const schema: FastifySchema = {
+      tags: ['vault'],
+      params: urlParamsSchema,
+      querystring: queryParamsSchema,
+      response: {
+        200: responseSchema,
+      },
+    };
+
+    instance.get<{ Params: UrlParams; Querystring: QueryParams }>(
+      '/:chain/bundles',
+      { schema },
+      async (request, reply) => {
+        const { chain } = request.params;
+        const { include_eol } = request.query;
+
+        const result = await asyncCache.wrap(`config:${chain}`, 5 * 60 * 1000, async () => {
+          const configs = await getBeefyVaultConfig(chain, vault =>
+            include_eol ? true : vault.status === 'active'
+          );
+
+          // remove clm vault from top levels if a vault exists on top
+          const clmVaultAddresses = new Set(
+            configs
+              .map(vault =>
+                vault.protocol_type === 'beefy_clm_vault'
+                  ? vault.beefy_clm_manager.vault_address
+                  : null
+              )
+              .map(address => address?.toLowerCase())
+              .filter(Boolean)
+          );
+
+          console.log(clmVaultAddresses);
+
+          const filteredConfigs = configs.filter(
+            vault => !clmVaultAddresses.has(vault.vault_address.toLowerCase())
+          );
+          return filteredConfigs;
+        });
+        reply.send(result);
+      }
+    );
+  }
+
   done();
 }
