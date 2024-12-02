@@ -7,7 +7,10 @@ import { addressSchema } from '../../schema/address';
 import { bigintSchema } from '../../schema/bigint';
 import { getAsyncCache } from '../../utils/async-lock';
 import { getSdksForChain, paginate } from '../../utils/sdk';
-import { getBeefyBreakdownableVaultConfig } from '../../vault-breakdown/vault/getBeefyVaultConfig';
+import {
+  type BeefyVault,
+  getBeefyBreakdownableVaultConfig,
+} from '../../vault-breakdown/vault/getBeefyVaultConfig';
 
 export default async function (
   instance: FastifyInstance,
@@ -94,7 +97,50 @@ export default async function (
           `vault:${chain}:${base_vault_id}:${block_number}:holders`,
           5 * 60 * 1000,
           async () =>
-            getVaultHoldersAsBaseVaultEquivalent(chain, base_vault_id, BigInt(block_number))
+            getVaultHoldersAsBaseVaultEquivalentForVaultId(
+              chain,
+              base_vault_id,
+              BigInt(block_number)
+            )
+        );
+
+        reply.send(result);
+      }
+    );
+  }
+
+  // all holder count list for all chains
+  {
+    const urlParamsSchema = Type.Object({
+      chain: chainIdSchema,
+      vault_address: addressSchema,
+      block_number: bigintSchema,
+    });
+    type UrlParams = Static<typeof urlParamsSchema>;
+
+    const schema: FastifySchema = {
+      tags: ['vault'],
+      params: urlParamsSchema,
+      response: {
+        200: vaultHoldersSchema,
+      },
+    };
+
+    instance.get<{ Params: UrlParams }>(
+      '/:chain/:vault_address/:block_number/bundle-holder-share-by-vault-address',
+      { schema },
+      async (request, reply) => {
+        const { chain, vault_address, block_number } = request.params;
+
+        const result = await asyncCache.wrap(
+          `vault:${chain}:${vault_address}:${block_number}:holders`,
+          5 * 60 * 1000,
+          async () =>
+            getVaultHoldersAsBaseVaultEquivalentForVaultAddress(
+              chain,
+              vault_address as Hex,
+              BigInt(block_number)
+            )
         );
 
         reply.send(result);
@@ -209,7 +255,27 @@ const getVaultHolders = async (
   });
 };
 
-const getVaultHoldersAsBaseVaultEquivalent = async (
+const getVaultHoldersAsBaseVaultEquivalentForVaultAddress = async (
+  chainId: ChainId,
+  vault_address: Hex,
+  block: bigint
+) => {
+  // first get the addresses linked to that vault id
+  const configs = await getBeefyBreakdownableVaultConfig(
+    chainId,
+    vault => vault.vault_address === vault_address
+  );
+  if (!configs.length) {
+    throw new Error(`Vault with "vault_address" ${vault_address} not found`);
+  }
+  if (configs.length > 1) {
+    throw new Error(`Vault with "vault_address" ${vault_address} is not unique`);
+  }
+
+  return _getVaultHoldersAsBaseVaultEquivalent(chainId, configs[0], block);
+};
+
+const getVaultHoldersAsBaseVaultEquivalentForVaultId = async (
   chainId: ChainId,
   vault_id: string,
   block: bigint
@@ -217,14 +283,20 @@ const getVaultHoldersAsBaseVaultEquivalent = async (
   // first get the addresses linked to that vault id
   const configs = await getBeefyBreakdownableVaultConfig(chainId, vault => vault.id === vault_id);
   if (!configs.length) {
-    throw new Error(`Vault ${vault_id} not found`);
+    throw new Error(`Vault with "id" ${vault_id} not found`);
   }
   if (configs.length > 1) {
-    throw new Error(`Vault ${vault_id} is not unique`);
+    throw new Error(`Vault with "id" ${vault_id} is not unique`);
   }
 
-  const config = configs[0];
+  return _getVaultHoldersAsBaseVaultEquivalent(chainId, configs[0], block);
+};
 
+const _getVaultHoldersAsBaseVaultEquivalent = async (
+  chainId: ChainId,
+  config: BeefyVault,
+  block: bigint
+) => {
   const tokens = uniq(
     (config.protocol_type === 'beefy_clm_vault'
       ? [
