@@ -42,7 +42,7 @@ export default async function (
         const { chain } = request.params;
         const { include_eol } = request.query;
 
-        const result = await asyncCache.wrap(`config:${chain}`, 5 * 60 * 1000, async () => {
+        const result = await asyncCache.wrap(`camelot:config:${chain}`, 5 * 60 * 1000, async () => {
           const configs = await getBeefyVaultConfig(
             chain,
             vault =>

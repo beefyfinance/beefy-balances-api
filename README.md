@@ -42,6 +42,8 @@ https://balance-api.beefy.finance/api/v1/vault/arbitrum/0x42cf53622b413b40cb24f7
 http://localhost:4000/api/v1/vault/arbitrum/0x42cf53622b413b40cb24f78a79e0e76e587b7f33/279181618/bundle-holder-share-by-vault-address
 https://balance-api.beefy.finance/api/v1/vault/arbitrum/0xf4ea976b260a498f26417b89f6dbdd555104a734/279181618/bundle-holder-share-by-vault-address
 http://localhost:4000/api/v1/vault/arbitrum/0xf4ea976b260a498f26417b89f6dbdd555104a734/279181618/bundle-holder-share-by-vault-address
+https://balance-api.beefy.finance/api/v1/vault/arbitrum/0xf4ea976b260a498f26417b89f6dbdd555104a734/279181618/bundle-holder-share-by-strategy-address
+http://localhost:4000/api/v1/vault/arbitrum/0xf4ea976b260a498f26417b89f6dbdd555104a734/279181618/bundle-holder-share-by-strategy-address
 
 
 ```

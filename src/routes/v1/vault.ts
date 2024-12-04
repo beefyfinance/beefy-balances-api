@@ -148,6 +148,45 @@ export default async function (
     );
   }
 
+  // all holder count list for all chains
+  {
+    const urlParamsSchema = Type.Object({
+      chain: chainIdSchema,
+      strategy_address: addressSchema,
+      block_number: bigintSchema,
+    });
+    type UrlParams = Static<typeof urlParamsSchema>;
+
+    const schema: FastifySchema = {
+      tags: ['vault'],
+      params: urlParamsSchema,
+      response: {
+        200: vaultHoldersSchema,
+      },
+    };
+
+    instance.get<{ Params: UrlParams }>(
+      '/:chain/:strategy_address/:block_number/bundle-holder-share-by-strategy-address',
+      { schema },
+      async (request, reply) => {
+        const { chain, strategy_address, block_number } = request.params;
+
+        const result = await asyncCache.wrap(
+          `vault:${chain}:${strategy_address}:${block_number}:holders`,
+          5 * 60 * 1000,
+          async () =>
+            getVaultHoldersAsBaseVaultEquivalentForStrategyAddress(
+              chain,
+              strategy_address as Hex,
+              BigInt(block_number)
+            )
+        );
+
+        reply.send(result);
+      }
+    );
+  }
+
   done();
 }
 
@@ -270,6 +309,26 @@ const getVaultHoldersAsBaseVaultEquivalentForVaultAddress = async (
   }
   if (configs.length > 1) {
     throw new Error(`Vault with "vault_address" ${vault_address} is not unique`);
+  }
+
+  return _getVaultHoldersAsBaseVaultEquivalent(chainId, configs[0], block);
+};
+
+const getVaultHoldersAsBaseVaultEquivalentForStrategyAddress = async (
+  chainId: ChainId,
+  strategy_address: Hex,
+  block: bigint
+) => {
+  // first get the addresses linked to that vault id
+  const configs = await getBeefyBreakdownableVaultConfig(
+    chainId,
+    vault => vault.strategy_address === strategy_address
+  );
+  if (!configs.length) {
+    throw new Error(`Vault with "strategy_address" ${strategy_address} not found`);
+  }
+  if (configs.length > 1) {
+    throw new Error(`Vault with "strategy_address" ${strategy_address} is not unique`);
   }
 
   return _getVaultHoldersAsBaseVaultEquivalent(chainId, configs[0], block);
