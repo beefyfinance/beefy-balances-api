@@ -24,6 +24,7 @@ export type BeefyVault = {
   pointStructureIds: string[];
   platformId: ApiPlatformId;
   status: 'active' | 'eol';
+  underlyingPlatform: string | null;
 } & (
   | {
       protocol_type: 'beefy_clm_vault';
@@ -109,6 +110,7 @@ export type ApiClmManager = {
   earnContractAddress: string; // reward pool address
   earnedTokenAddress: string; // clm manager address
   pointStructureIds?: string[];
+  tokenProviderId?: string;
 };
 
 export type ApiClmRewardPool = {
@@ -246,6 +248,7 @@ const getAllConfigs = async (chain: ChainId): Promise<BeefyVault[]> => {
     const reward_pools = clmRewardPoolDataPerClmAddress[vault_address] ?? [];
 
     const boosts = boostPerUnderlyingAddress[vault_address] ?? [];
+    const underlyingPlatform = vault.tokenProviderId ?? null;
 
     return {
       id: vault.id,
@@ -257,6 +260,7 @@ const getAllConfigs = async (chain: ChainId): Promise<BeefyVault[]> => {
       status: vault.status,
       strategy_address: vault.strategy.toLocaleLowerCase() as Hex,
       undelying_lp_address,
+      underlyingPlatform,
       reward_pools: reward_pools.map(pool => ({
         id: pool.id,
         clm_address: pool.tokenAddress.toLocaleLowerCase() as Hex,
@@ -305,12 +309,16 @@ const getAllConfigs = async (chain: ChainId): Promise<BeefyVault[]> => {
         : { protocol_type, platformId: vault.platformId };
     const reward_pools = vaultRewardPoolDataPerVaultAddress[vault_address] ?? [];
     const boosts = boostPerUnderlyingAddress[vault_address] ?? [];
+
+    const underlyingPlatform = vault.platformId ?? null;
+
     return {
       id: vault.id,
       vault_address,
       chain: vault.chain,
       vault_token_symbol: vault.earnedToken,
       ...additionalConfig,
+      underlyingPlatform,
       strategy_address: vault.strategy.toLocaleLowerCase() as Hex,
       undelying_lp_address: underlying_lp_address,
       status: vault.status,

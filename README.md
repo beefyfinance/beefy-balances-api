@@ -25,6 +25,9 @@ https://balance-api.beefy.finance/api/v1/config/arbitrum/bundles
 http://localhost:4000/api/v1/config/arbitrum/bundles
 
 
+https://balance-api.beefy.finance/api/v1/partner/camelot/config/arbitrum/bundles
+http://localhost:4000/api/v1/partner/camelot/config/arbitrum/bundles
+
 https://balance-api.beefy.finance/api/v1/vault/base/baseswap-cow-weth-cbbtc/20449610/bundle-holder-share
 http://localhost:4000/api/v1/vault/base/baseswap-cow-weth-cbbtc/20449610/bundle-holder-share
 https://balance-api.beefy.finance/api/v1/vault/arbitrum/camelot-order-weth/279181618/bundle-holder-share
