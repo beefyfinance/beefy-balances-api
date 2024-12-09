@@ -62,8 +62,6 @@ export default async function (
               .filter(Boolean)
           );
 
-          console.log(clmVaultAddresses);
-
           const filteredConfigs = configs.filter(
             vault => !clmVaultAddresses.has(vault.vault_address.toLowerCase())
           );
