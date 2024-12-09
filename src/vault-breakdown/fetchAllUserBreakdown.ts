@@ -45,7 +45,7 @@ export const getUserTVLAtBlock = async (
     (typeof investorPositions)[0]
   > = {};
   for (const position of investorPositions) {
-    const vaultAddress = vaultRewardPoolMap[position.token_address];
+    const vaultAddress = vaultRewardPoolMap[position.token_address.toLowerCase()] as Hex;
     const key = `${position.user_address}_${vaultAddress}`;
     if (!mergedInvestorPositionsByInvestorAndClmAddress[key]) {
       mergedInvestorPositionsByInvestorAndClmAddress[key] = position;
@@ -97,7 +97,8 @@ export const getUserTVLAtBlock = async (
     >
   > = {};
   for (const position of mergedPositions) {
-    const breakdown = breakdownByVaultAddress[position.token_address];
+    const vaultAddress = vaultRewardPoolMap[position.token_address.toLowerCase()] as Hex;
+    const breakdown = breakdownByVaultAddress[vaultAddress];
     if (!breakdown) {
       // some test vaults were never available in the api
       continue;
