@@ -49,4 +49,7 @@ https://balance-api.beefy.finance/api/v1/vault/arbitrum/0xf4ea976b260a498f26417b
 http://localhost:4000/api/v1/vault/arbitrum/0xf4ea976b260a498f26417b89f6dbdd555104a734/279181618/bundle-holder-share-by-strategy-address
 
 
+https://balance-api.beefy.finance/api/v1/vault/arbitrum/top-holders?vault_addresses=0x0481ad5b536139472af5ce692330dbf00bbd8672&vault_addresses=0x0d1f71170d93121b48a9e8fc7400e8e6a6821500&limit=1
+http://localhost:4000/api/v1/vault/arbitrum/top-holders?vault_addresses=0x0481ad5b536139472af5ce692330dbf00bbd8672&vault_addresses=0x0d1f71170d93121b48a9e8fc7400e8e6a6821500&limit=1
+
 ```
