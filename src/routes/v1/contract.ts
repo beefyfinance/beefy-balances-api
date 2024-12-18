@@ -1,5 +1,6 @@
 import { type Static, Type } from '@sinclair/typebox';
 import type { FastifyInstance, FastifyPluginOptions, FastifySchema } from 'fastify';
+import { min } from 'lodash';
 import type { Hex } from 'viem';
 import { type ChainId, chainIdSchema } from '../../config/chains';
 import { addressSchema } from '../../schema/address';
@@ -87,48 +88,51 @@ const getContractHolders = async (
     await Promise.all(
       getSdksForChain(chainId).map(sdk =>
         paginate({
-          fetchPage: ({ skip, first }) =>
-            sdk.VaultSharesBalances({
-              skip,
-              first,
-              block: Number(block),
-              account_not_in: ['0x0000000000000000000000000000000000000000'], // empty list returns nothing
-              token_in_1: [contract_address],
-              token_in_2: [contract_address],
+          fetchPage: ({ skip: tokenSkip, first: tokenFirst }) =>
+            paginate({
+              fetchPage: ({ skip, first }) =>
+                sdk.VaultSharesBalances({
+                  tokenSkip,
+                  tokenFirst,
+                  skip,
+                  first,
+                  block: Number(block),
+                  account_not_in: ['0x0000000000000000000000000000000000000000'], // empty list returns nothing
+                  token_in_1: [contract_address],
+                  token_in_2: [contract_address],
+                }),
+              count: res => min(res.data.tokens.map(token => token.balances.length)) ?? 0,
             }),
-          count: res => res.data.tokenBalances.length,
+          count: res => min(res.map(chainRes => chainRes.data.tokens.length)) ?? 0,
         })
       )
     )
   ).flat();
 
-  return res.flatMap(chainRes => {
-    const tokens = chainRes.data.tokens;
-    const balances = chainRes.data.tokenBalances;
+  return res.flatMap(chainRes =>
+    chainRes.flatMap(tokenPage =>
+      tokenPage.data.tokens.map(token => {
+        if (!token.symbol) {
+          throw new Error(`Token ${token.id} has no symbol`);
+        }
+        if (!token.decimals) {
+          throw new Error(`Token ${token.id} has no decimals`);
+        }
+        if (!token.name) {
+          throw new Error(`Token ${token.id} has no name`);
+        }
 
-    return tokens.map(token => {
-      const tokenBalances = balances.filter(balance => balance.token.id === token.id);
-
-      if (!token.symbol) {
-        throw new Error(`Token ${token.id} has no symbol`);
-      }
-      if (!token.decimals) {
-        throw new Error(`Token ${token.id} has no decimals`);
-      }
-      if (!token.name) {
-        throw new Error(`Token ${token.id} has no name`);
-      }
-
-      return {
-        id: token.id,
-        name: token.name,
-        symbol: token.symbol,
-        decimals: Number.parseInt(token.decimals, 10),
-        balances: tokenBalances.map(balance => ({
-          balance: balance.amount,
-          holder: balance.account.id,
-        })),
-      };
-    });
-  });
+        return {
+          id: token.id,
+          name: token.name,
+          symbol: token.symbol,
+          decimals: Number.parseInt(token.decimals, 10),
+          balances: token.balances.map(balance => ({
+            balance: balance.amount,
+            holder: balance.account.id,
+          })),
+        };
+      })
+    )
+  );
 };

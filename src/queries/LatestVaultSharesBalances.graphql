@@ -1,8 +1,7 @@
-query VaultSharesBalances(
+query LatestVaultSharesBalances(
   $token_in_1: [Bytes!]!
   $token_in_2: [String!]!
   $account_not_in: [String!]!
-  $block: Int
   $tokenFirst: Int = 1000
   $tokenSkip: Int = 0
   $first: Int = 1000
@@ -21,7 +20,6 @@ query VaultSharesBalances(
       skip: $skip
       where: {
         amount_gt: 0
-        token_in: $token_in_2
         account_not_in: $account_not_in
       }
     ) {

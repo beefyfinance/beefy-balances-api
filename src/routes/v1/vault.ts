@@ -1,6 +1,6 @@
 import { type Static, Type } from '@sinclair/typebox';
 import type { FastifyInstance, FastifyPluginOptions, FastifySchema } from 'fastify';
-import { groupBy, keyBy, uniq } from 'lodash';
+import { groupBy, keyBy, min, uniq } from 'lodash';
 import type { Hex } from 'viem';
 import { type ChainId, chainIdSchema } from '../../config/chains';
 import { addressSchema } from '../../schema/address';
@@ -18,6 +18,49 @@ export default async function (
   done: (err?: Error) => void
 ) {
   const asyncCache = getAsyncCache();
+
+  // all holder count list for all chains
+  {
+    const urlParamsSchema = Type.Object({
+      chain: chainIdSchema,
+    });
+    type UrlParams = Static<typeof urlParamsSchema>;
+
+    const querySchema = Type.Object({
+      vault_addresses: Type.Array(addressSchema, { minItems: 1, maxItems: 100 }),
+      limit: Type.Number({ default: 100, minimum: 1, maximum: 1000 }),
+    });
+    type QueryParams = Static<typeof querySchema>;
+
+    const schema: FastifySchema = {
+      tags: ['vault'],
+      params: urlParamsSchema,
+      querystring: querySchema,
+      response: {
+        200: vaultHoldersSchema,
+      },
+    };
+
+    instance.get<{ Params: UrlParams; Querystring: QueryParams }>(
+      '/:chain/top-holders',
+      { schema },
+      async (request, reply) => {
+        const { chain } = request.params;
+        const { vault_addresses, limit } = request.query;
+
+        if (!vault_addresses || !Array.isArray(vault_addresses) || vault_addresses.length === 0) {
+          throw new Error('vault_addresses is required');
+        }
+
+        const result = await asyncCache.wrap(
+          `vault:${chain}:${vault_addresses.join(',')}:top-holders:${limit}`,
+          5 * 60 * 1000,
+          async () => await getTopHolders(chain, vault_addresses as Hex[], limit)
+        );
+        reply.send(result);
+      }
+    );
+  }
 
   // all holder count list for all chains
   {
@@ -248,50 +291,53 @@ const getVaultHolders = async (
     await Promise.all(
       getSdksForChain(chainId).map(sdk =>
         paginate({
-          fetchPage: ({ skip, first }) =>
-            sdk.VaultSharesBalances({
-              skip,
-              first,
-              block: Number(block),
-              account_not_in: excludeHolders,
-              token_in_1: tokens,
-              token_in_2: tokens,
+          fetchPage: ({ skip: tokenSkip, first: tokenFirst }) =>
+            paginate({
+              fetchPage: ({ skip, first }) =>
+                sdk.VaultSharesBalances({
+                  tokenSkip,
+                  tokenFirst,
+                  skip,
+                  first,
+                  block: Number(block),
+                  account_not_in: excludeHolders,
+                  token_in_1: tokens,
+                  token_in_2: tokens,
+                }),
+              count: res => min(res.data.tokens.map(token => token.balances.length)) ?? 0,
             }),
-          count: res => res.data.tokenBalances.length,
+          count: res => min(res.map(chainRes => chainRes.data.tokens.length)) ?? 0,
         })
       )
     )
   ).flat();
 
-  return res.flatMap(chainRes => {
-    const tokens = chainRes.data.tokens;
-    const balances = chainRes.data.tokenBalances;
+  return res.flatMap(chainRes =>
+    chainRes.flatMap(tokenPage =>
+      tokenPage.data.tokens.map(token => {
+        if (!token.symbol) {
+          throw new Error(`Token ${token.id} has no symbol`);
+        }
+        if (!token.decimals) {
+          throw new Error(`Token ${token.id} has no decimals`);
+        }
+        if (!token.name) {
+          throw new Error(`Token ${token.id} has no name`);
+        }
 
-    return tokens.map(token => {
-      const tokenBalances = balances.filter(balance => balance.token.id === token.id);
-
-      if (!token.symbol) {
-        throw new Error(`Token ${token.id} has no symbol`);
-      }
-      if (!token.decimals) {
-        throw new Error(`Token ${token.id} has no decimals`);
-      }
-      if (!token.name) {
-        throw new Error(`Token ${token.id} has no name`);
-      }
-
-      return {
-        id: token.id,
-        name: token.name,
-        symbol: token.symbol,
-        decimals: Number.parseInt(token.decimals, 10),
-        balances: tokenBalances.map(balance => ({
-          balance: balance.amount,
-          holder: balance.account.id,
-        })),
-      };
-    });
-  });
+        return {
+          id: token.id,
+          name: token.name,
+          symbol: token.symbol,
+          decimals: Number.parseInt(token.decimals, 10),
+          balances: token.balances.map(balance => ({
+            balance: balance.amount,
+            holder: balance.account.id,
+          })),
+        };
+      })
+    )
+  );
 };
 
 const getVaultHoldersAsBaseVaultEquivalentForVaultAddress = async (
@@ -386,51 +432,54 @@ const _getVaultHoldersAsBaseVaultEquivalent = async (
     await Promise.all(
       getSdksForChain(chainId).map(sdk =>
         paginate({
-          fetchPage: ({ skip, first }) =>
-            sdk.VaultSharesBalances({
-              skip,
-              first,
-              block: Number(block),
-              account_not_in: ['0x0000000000000000000000000000000000000000'],
-              token_in_1: tokens,
-              token_in_2: tokens,
+          fetchPage: ({ skip: tokenSkip, first: tokenFirst }) =>
+            paginate({
+              fetchPage: ({ skip, first }) =>
+                sdk.VaultSharesBalances({
+                  tokenSkip,
+                  tokenFirst,
+                  skip,
+                  first,
+                  block: Number(block),
+                  account_not_in: ['0x0000000000000000000000000000000000000000'],
+                  token_in_1: tokens,
+                  token_in_2: tokens,
+                }),
+              count: res => min(res.data.tokens.map(token => token.balances.length)) ?? 0,
             }),
-          count: res => res.data.tokenBalances.length,
+          count: res => min(res.map(chainRes => chainRes.data.tokens.length)) ?? 0,
         })
       )
     )
   ).flat();
 
   const balancesByContract = keyBy(
-    res.flatMap(chainRes => {
-      const tokens = chainRes.data.tokens;
-      const balances = chainRes.data.tokenBalances;
+    res.flatMap(chainRes =>
+      chainRes.flatMap(tokenPage =>
+        tokenPage.data.tokens.map(token => {
+          if (!token.symbol) {
+            throw new Error(`Token ${token.id} has no symbol`);
+          }
+          if (!token.decimals) {
+            throw new Error(`Token ${token.id} has no decimals`);
+          }
+          if (!token.name) {
+            throw new Error(`Token ${token.id} has no name`);
+          }
 
-      return tokens.map(token => {
-        const tokenBalances = balances.filter(balance => balance.token.id === token.id);
-
-        if (!token.symbol) {
-          throw new Error(`Token ${token.id} has no symbol`);
-        }
-        if (!token.decimals) {
-          throw new Error(`Token ${token.id} has no decimals`);
-        }
-        if (!token.name) {
-          throw new Error(`Token ${token.id} has no name`);
-        }
-
-        return {
-          id: token.id.toLowerCase(),
-          name: token.name,
-          symbol: token.symbol,
-          decimals: Number.parseInt(token.decimals, 10),
-          balances: tokenBalances.map(balance => ({
-            balance: balance.amount,
-            holder: balance.account.id,
-          })),
-        };
-      });
-    }),
+          return {
+            id: token.id.toLowerCase(),
+            name: token.name,
+            symbol: token.symbol,
+            decimals: Number.parseInt(token.decimals, 10),
+            balances: token.balances.map(balance => ({
+              balance: balance.amount,
+              holder: balance.account.id,
+            })),
+          };
+        })
+      )
+    ),
     e => e.id
   );
 
@@ -589,4 +638,51 @@ const _getVaultHoldersAsBaseVaultEquivalent = async (
     hold_details: balances.flatMap(e => e.hold_details),
   }));
   return mergedHolders;
+};
+
+const getTopHolders = async (chainId: ChainId, vault_addresses: Hex[], limit: number) => {
+  const res = (
+    await Promise.all(
+      getSdksForChain(chainId).map(sdk =>
+        paginate({
+          fetchPage: ({ skip: tokenSkip, first: tokenFirst }) =>
+            sdk.VaultSharesBalances({
+              tokenSkip,
+              tokenFirst,
+              skip: 0,
+              first: limit,
+              account_not_in: ['0x0000000000000000000000000000000000000000'], // providing an empty account_not_in will return 0 holders
+              token_in_1: vault_addresses,
+              token_in_2: vault_addresses,
+            }),
+          count: res => res.data.tokens.length,
+        })
+      )
+    )
+  ).flat();
+
+  return res.flatMap(chainRes =>
+    chainRes.data.tokens.map(token => {
+      if (!token.symbol) {
+        throw new Error(`Token ${token.id} has no symbol`);
+      }
+      if (!token.decimals) {
+        throw new Error(`Token ${token.id} has no decimals`);
+      }
+      if (!token.name) {
+        throw new Error(`Token ${token.id} has no name`);
+      }
+
+      return {
+        id: token.id,
+        name: token.name,
+        symbol: token.symbol,
+        decimals: Number.parseInt(token.decimals, 10),
+        balances: token.balances.map(balance => ({
+          balance: balance.amount,
+          holder: balance.account.id,
+        })),
+      };
+    })
+  );
 };
