@@ -23,49 +23,6 @@ export default async function (
   {
     const urlParamsSchema = Type.Object({
       chain: chainIdSchema,
-    });
-    type UrlParams = Static<typeof urlParamsSchema>;
-
-    const querySchema = Type.Object({
-      vault_addresses: Type.Array(addressSchema, { minItems: 1, maxItems: 100 }),
-      limit: Type.Number({ default: 100, minimum: 1, maximum: 1000 }),
-    });
-    type QueryParams = Static<typeof querySchema>;
-
-    const schema: FastifySchema = {
-      tags: ['vault'],
-      params: urlParamsSchema,
-      querystring: querySchema,
-      response: {
-        200: vaultHoldersSchema,
-      },
-    };
-
-    instance.get<{ Params: UrlParams; Querystring: QueryParams }>(
-      '/:chain/top-holders',
-      { schema },
-      async (request, reply) => {
-        const { chain } = request.params;
-        const { vault_addresses, limit } = request.query;
-
-        if (!vault_addresses || !Array.isArray(vault_addresses) || vault_addresses.length === 0) {
-          throw new Error('vault_addresses is required');
-        }
-
-        const result = await asyncCache.wrap(
-          `vault:${chain}:${vault_addresses.join(',')}:top-holders:${limit}`,
-          5 * 60 * 1000,
-          async () => await getTopHolders(chain, vault_addresses as Hex[], limit)
-        );
-        reply.send(result);
-      }
-    );
-  }
-
-  // all holder count list for all chains
-  {
-    const urlParamsSchema = Type.Object({
-      chain: chainIdSchema,
       vault_id: Type.String({ description: 'The vault id or clm manager id or reward pool id' }),
       block_number: bigintSchema,
     });
@@ -294,7 +251,7 @@ const getVaultHolders = async (
           fetchPage: ({ skip: tokenSkip, first: tokenFirst }) =>
             paginate({
               fetchPage: ({ skip, first }) =>
-                sdk.VaultSharesBalances({
+                sdk.TokenBalance({
                   tokenSkip,
                   tokenFirst,
                   skip,
@@ -435,7 +392,7 @@ const _getVaultHoldersAsBaseVaultEquivalent = async (
           fetchPage: ({ skip: tokenSkip, first: tokenFirst }) =>
             paginate({
               fetchPage: ({ skip, first }) =>
-                sdk.VaultSharesBalances({
+                sdk.TokenBalance({
                   tokenSkip,
                   tokenFirst,
                   skip,
@@ -638,51 +595,4 @@ const _getVaultHoldersAsBaseVaultEquivalent = async (
     hold_details: balances.flatMap(e => e.hold_details),
   }));
   return mergedHolders;
-};
-
-const getTopHolders = async (chainId: ChainId, vault_addresses: Hex[], limit: number) => {
-  const res = (
-    await Promise.all(
-      getSdksForChain(chainId).map(sdk =>
-        paginate({
-          fetchPage: ({ skip: tokenSkip, first: tokenFirst }) =>
-            sdk.VaultSharesBalances({
-              tokenSkip,
-              tokenFirst,
-              skip: 0,
-              first: limit,
-              account_not_in: ['0x0000000000000000000000000000000000000000'], // providing an empty account_not_in will return 0 holders
-              token_in_1: vault_addresses,
-              token_in_2: vault_addresses,
-            }),
-          count: res => res.data.tokens.length,
-        })
-      )
-    )
-  ).flat();
-
-  return res.flatMap(chainRes =>
-    chainRes.data.tokens.map(token => {
-      if (!token.symbol) {
-        throw new Error(`Token ${token.id} has no symbol`);
-      }
-      if (!token.decimals) {
-        throw new Error(`Token ${token.id} has no decimals`);
-      }
-      if (!token.name) {
-        throw new Error(`Token ${token.id} has no name`);
-      }
-
-      return {
-        id: token.id,
-        name: token.name,
-        symbol: token.symbol,
-        decimals: Number.parseInt(token.decimals, 10),
-        balances: token.balances.map(balance => ({
-          balance: balance.amount,
-          holder: balance.account.id,
-        })),
-      };
-    })
-  );
 };

@@ -1,4 +1,4 @@
-query VaultSharesBalances(
+query TokenBalance(
   $token_in_1: [Bytes!]!
   $token_in_2: [String!]!
   $account_not_in: [String!]!
@@ -7,6 +7,8 @@ query VaultSharesBalances(
   $tokenSkip: Int = 0
   $first: Int = 1000
   $skip: Int = 0
+  $orderBy: TokenBalance_orderBy = id
+  $orderDirection: OrderDirection = desc
 ) {
   tokens(first: $tokenFirst, skip: $tokenSkip, where: { id_in: $token_in_1 }) {
     id
@@ -15,8 +17,8 @@ query VaultSharesBalances(
     symbol
 
     balances(
-      orderBy: id
-      orderDirection: desc
+      orderBy: $orderBy
+      orderDirection: $orderDirection
       first: $first
       skip: $skip
       where: {

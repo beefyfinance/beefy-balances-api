@@ -8,8 +8,8 @@ http://localhost:4000/api/v1/status
 https://balance-api.beefy.finance/api/v1/holders/counts/all
 http://localhost:4000/api/v1/holders/counts/all
 
-https://balance-api.beefy.finance/api/v1/vault/arbitrum/top-holders?vault_addresses=0x0481ad5b536139472af5ce692330dbf00bbd8672&vault_addresses=0x0d1f71170d93121b48a9e8fc7400e8e6a6821500&limit=10
-http://localhost:4000/api/v1/vault/arbitrum/top-holders?vault_addresses=0x0481ad5b536139472af5ce692330dbf00bbd8672&vault_addresses=0x0d1f71170d93121b48a9e8fc7400e8e6a6821500&limit=10
+https://balance-api.beefy.finance/api/v1/contract/arbitrum/top-holders?contract_addresses=0x0481ad5b536139472af5ce692330dbf00bbd8672&contract_addresses=0x0d1f71170d93121b48a9e8fc7400e8e6a6821500&limit=10
+http://localhost:4000/api/v1/contract/arbitrum/top-holders?contract_addresses=0x0481ad5b536139472af5ce692330dbf00bbd8672&contract_addresses=0x0d1f71170d93121b48a9e8fc7400e8e6a6821500&limit=10
 
 https://balance-api.beefy.finance/api/v1/vault/base/baseswap-cow-weth-cbbtc/20449610/share-tokens-balances
 http://localhost:4000/api/v1/vault/base/baseswap-cow-weth-cbbtc/20449610/share-tokens-balances
