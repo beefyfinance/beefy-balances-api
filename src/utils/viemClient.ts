@@ -7,7 +7,6 @@ import {
   fantom,
   fraxtal,
   gnosis,
-  //kava,
   linea,
   lisk,
   mainnet,
@@ -21,6 +20,7 @@ import {
   rootstock,
   scroll,
   sei,
+  sonic,
   zksync,
 } from 'viem/chains';
 import type { ChainId } from '../config/chains';
@@ -47,6 +47,7 @@ const mapping: Record<ChainId, ViemChain> = {
   rootstock: rootstock,
   scroll: scroll,
   sei: sei,
+  sonic: sonic,
   zksync: zksync,
 };
 

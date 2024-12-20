@@ -1,7 +1,28 @@
 # beefy-balances-api
 
-```
 
+Access api for the CLM subgraph: https://github.com/beefyfinance/beefy-balances-subgraph
+
+## add a new chain
+
+- Add the chain to `src/config/chains.ts`
+- `npm run update:addressbook` 
+- `npm run test:ts` and fix errs
+- `npm run format`
+- `npm run dev` 
+    - http://localhost:4000/api/v1/status
+    - http://localhost:4000/api/v1/holders/counts/all
+    - http://localhost:4000/api/v1/config/:chain/vaults
+    - http://localhost:4000/api/v1/contract/:chain/:vault_address/:block_number/share-tokens-balances
+    
+    
+## Deploy the api
+
+- `npm run deploy` to deploy the api
+
+
+# Test urls
+```
 https://balance-api.beefy.finance/api/v1/status
 http://localhost:4000/api/v1/status
 

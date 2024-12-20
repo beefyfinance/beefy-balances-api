@@ -24,6 +24,7 @@
     "package:fix": "ncu -u && npm install",
     "postinstall": "npm --silent run codegen",
     "codegen": "graphql-codegen --config ./src/queries/codegen/codegen.ts",
+    "update:addressbook": "ncu --upgrade blockchain-addressbook viem && i install",
     "lint-staged": "lint-staged"
   },
   "dependencies": {
@@ -38,7 +39,7 @@
     "@sinclair/typebox": "^0.32.33",
     "@types/lodash-es": "^4.17.12",
     "async-lock": "^1.4.1",
-    "blockchain-addressbook": "^0.47.98",
+    "blockchain-addressbook": "^0.47.107",
     "decimal.js": "^10.4.3",
     "dotenv": "^16.4.5",
     "fastify": "^4.26.2",
@@ -48,7 +49,7 @@
     "lodash": "^4.17.21",
     "node-cache": "^5.1.2",
     "pino": "^8.19.0",
-    "viem": "^2.21.54"
+    "viem": "^2.21.56"
   },
   "lint-staged": {
     "src/**/*.{ts,graphql,json}": "biome check --write"
