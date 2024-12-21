@@ -1,0 +1,36 @@
+query ContractBalance(
+  $token_in_1: [Bytes!]!
+  $token_in_2: [String!]!
+  $account_not_in: [String!]!
+  $block: Int
+  $tokenFirst: Int = 1000
+  $tokenSkip: Int = 0
+  $first: Int = 1000
+  $skip: Int = 0
+  $orderBy: TokenBalance_orderBy = id
+  $orderDirection: OrderDirection = desc
+) {
+  tokens(first: $tokenFirst, skip: $tokenSkip, where: { id_in: $token_in_1 }) {
+    id
+    name
+    decimals
+    symbol
+
+    balances(
+      orderBy: $orderBy
+      orderDirection: $orderDirection
+      first: $first
+      skip: $skip
+      where: {
+        rawAmount_gt: 0
+        token_in: $token_in_2
+        account_not_in: $account_not_in
+      }
+    ) {
+      account {
+        id
+      }
+      rawAmount
+    }
+  }
+}

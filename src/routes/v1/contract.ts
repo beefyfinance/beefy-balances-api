@@ -106,7 +106,7 @@ export default async function (
         const result = await asyncCache.wrap(
           `vault:${chain}:${contract_addresses.join(',')}:top-holders:${limit}`,
           5 * 60 * 1000,
-          async () => await getTopHolders(chain, contract_addresses as Hex[], limit)
+          async () => await getTopContractHolders(chain, contract_addresses as Hex[], limit)
         );
         reply.send(result);
       }
@@ -185,20 +185,24 @@ const getContractHolders = async (
   );
 };
 
-const getTopHolders = async (chainId: ChainId, vault_addresses: Hex[], limit: number) => {
+const getTopContractHolders = async (
+  chainId: ChainId,
+  contract_addresses: Hex[],
+  limit: number
+) => {
   const res = (
     await Promise.all(
       getSdksForChain(chainId).map(sdk =>
         paginate({
           fetchPage: ({ skip: tokenSkip, first: tokenFirst }) =>
-            sdk.TokenBalance({
+            sdk.ContractBalance({
               tokenSkip,
               tokenFirst,
               skip: 0,
               first: limit,
               account_not_in: ['0x0000000000000000000000000000000000000000'], // providing an empty account_not_in will return 0 holders
-              token_in_1: vault_addresses,
-              token_in_2: vault_addresses,
+              token_in_1: contract_addresses,
+              token_in_2: contract_addresses,
               orderBy: TokenBalance_OrderBy.Amount,
               orderDirection: OrderDirection.Desc,
             }),
@@ -226,7 +230,7 @@ const getTopHolders = async (chainId: ChainId, vault_addresses: Hex[], limit: nu
         symbol: token.symbol,
         decimals: Number.parseInt(token.decimals, 10),
         balances: token.balances.map(balance => ({
-          balance: balance.amount,
+          rawAmount: balance.rawAmount,
           holder: balance.account.id,
         })),
       };
