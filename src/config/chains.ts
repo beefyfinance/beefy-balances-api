@@ -5,6 +5,7 @@ export enum ChainId {
   arbitrum = 'arbitrum',
   avax = 'avax',
   base = 'base',
+  berachain = 'berachain',
   bsc = 'bsc',
   ethereum = 'ethereum',
   fantom = 'fantom',
