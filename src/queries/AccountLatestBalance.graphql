@@ -1,0 +1,26 @@
+query AccountLatestBalance($address: ID!, $first: Int = 1000, $skip: Int = 0) {
+  account(id: $address) {
+    balances(
+      skip: $skip
+      first: $first
+      where: { rawAmount_gt: 0 }
+      orderBy: id
+      orderDirection: asc
+    ) {
+      token {
+        id
+        symbol
+        name
+        decimals
+      }
+      amount
+      rawAmount
+    }
+  }
+  _meta {
+    block {
+      number
+      timestamp
+    }
+  }
+}
