@@ -153,7 +153,7 @@ export default async function (
         const { address } = request.params;
 
         const result = await asyncCache.wrap(
-          `latest-balances:${address}`,
+          `latest-balances:${address.toLowerCase()}`,
           60 * 1000,
           async () => await getLatestBalances(address)
         );
