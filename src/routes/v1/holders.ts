@@ -14,22 +14,31 @@ const holderCountSchema = Type.Object({
 });
 type HolderCount = Static<typeof holderCountSchema>;
 
+const tokenSchema = Type.Object({
+  address: addressSchema,
+  symbol: Type.String(),
+  name: Type.String(),
+  decimals: Type.Number(),
+});
+
 const balanceSchema = Type.Object({
-  chain: chainIdSchema,
-  token: Type.Object({
-    address: addressSchema,
-    symbol: Type.String(),
-    name: Type.String(),
-    decimals: Type.Number(),
-  }),
+  token: tokenSchema,
   amount: Type.String(),
   rawAmount: Type.String(),
-  block: Type.Object({
-    number: Type.Number(),
-    timestamp: Type.Number(),
-  }),
 });
-type Balance = Static<typeof balanceSchema>;
+
+const blockSchema = Type.Object({
+  number: Type.Number(),
+  timestamp: Type.Number(),
+});
+
+const chainDataSchema = Type.Object({
+  chain: chainIdSchema,
+  block: blockSchema,
+  balances: Type.Array(balanceSchema),
+});
+
+type ChainData = Static<typeof chainDataSchema>;
 
 // Business Logic
 const getHolderCount = async (): Promise<Array<HolderCount>> => {
@@ -57,7 +66,7 @@ const getHolderCount = async (): Promise<Array<HolderCount>> => {
   );
 };
 
-const getLatestBalances = async (address: string): Promise<{ balances: Balance[] }> => {
+const getLatestBalances = async (address: string): Promise<ChainData[]> => {
   const res = (
     await Promise.all(
       getAllSdks().map(sdk =>
@@ -74,15 +83,14 @@ const getLatestBalances = async (address: string): Promise<{ balances: Balance[]
     )
   ).flat();
 
-  const balances = res.flatMap(chainRes => {
-    if (!chainRes.data.account) return [];
+  const chains = res.flatMap(chainRes => {
+    if (!chainRes.data.account || !chainRes.data._meta) return [];
 
-    return chainRes.data.account.balances.map(balance => {
+    const balances = chainRes.data.account.balances.map(balance => {
       const decimals = Number.parseInt(balance.token.decimals);
       const amount = interpretAsDecimal(balance.rawAmount, decimals).toString();
 
       return {
-        chain: chainRes.chain,
         token: {
           address: balance.token.id,
           symbol: balance.token.symbol ?? '',
@@ -91,15 +99,22 @@ const getLatestBalances = async (address: string): Promise<{ balances: Balance[]
         },
         amount,
         rawAmount: balance.rawAmount,
-        block: {
-          number: chainRes.data?._meta?.block?.number ?? 0,
-          timestamp: chainRes.data?._meta?.block?.timestamp ?? 0,
-        },
       };
     });
+
+    return [
+      {
+        chain: chainRes.chain,
+        block: {
+          number: chainRes.data._meta.block.number ?? 0,
+          timestamp: chainRes.data._meta.block.timestamp ?? 0,
+        },
+        balances,
+      },
+    ];
   });
 
-  return { balances };
+  return chains;
 };
 
 // Route Handler
@@ -141,7 +156,7 @@ export default async function (
       params: urlParamsSchema,
       response: {
         200: Type.Object({
-          balances: Type.Array(balanceSchema),
+          chains: Type.Array(chainDataSchema),
         }),
       },
     };
