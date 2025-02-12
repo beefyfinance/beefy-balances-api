@@ -275,66 +275,71 @@ const getAllConfigs = async (chain: ChainId): Promise<BeefyVault[]> => {
     };
   });
 
-  const mooVaultCofigs = mooVaultsData.map((vault): BeefyVault => {
-    let underlying_lp_address = vault.tokenAddress?.toLocaleLowerCase() as Hex | undefined;
-    const vault_address = vault.earnedTokenAddress.toLocaleLowerCase() as Hex;
+  const mooVaultCofigs = mooVaultsData
+    .filter(vault => {
+      const dropEol = ['aave-matic-eol'];
+      return !dropEol.includes(vault.id);
+    })
+    .map((vault): BeefyVault => {
+      let underlying_lp_address = vault.tokenAddress?.toLocaleLowerCase() as Hex | undefined;
+      const vault_address = vault.earnedTokenAddress.toLocaleLowerCase() as Hex;
 
-    if (
-      !underlying_lp_address &&
-      (isNativeToken(chain, vault.token) || isNativeToken(chain, vault.name))
-    ) {
-      const wnative = getWNativeToken(chain);
-      underlying_lp_address = wnative.address as Hex;
-    }
+      if (
+        !underlying_lp_address &&
+        (isNativeToken(chain, vault.token) || isNativeToken(chain, vault.name))
+      ) {
+        const wnative = getWNativeToken(chain);
+        underlying_lp_address = wnative.address as Hex;
+      }
 
-    if (!underlying_lp_address) {
-      throw new FriendlyError(`Missing "tokenAddress" field for vault ${vault.id}.`);
-    }
+      if (!underlying_lp_address) {
+        throw new FriendlyError(`Missing "tokenAddress" field for vault ${vault.id}.`);
+      }
 
-    const protocol_type: BeefyProtocolType | undefined = clmManagerAddresses.has(
-      underlying_lp_address
-    )
-      ? 'beefy_clm_vault'
-      : protocol_map[vault.platformId];
+      const protocol_type: BeefyProtocolType | undefined = clmManagerAddresses.has(
+        underlying_lp_address
+      )
+        ? 'beefy_clm_vault'
+        : protocol_map[vault.platformId];
 
-    const additionalConfig =
-      protocol_type === 'beefy_clm_vault'
-        ? {
-            protocol_type,
-            platformId: vault.platformId,
-            beefy_clm_manager: clmVaultConfigs.find(
-              v => v.vault_address === underlying_lp_address
-            ) as BeefyVault,
-          }
-        : { protocol_type, platformId: vault.platformId };
-    const reward_pools = vaultRewardPoolDataPerVaultAddress[vault_address] ?? [];
-    const boosts = boostPerUnderlyingAddress[vault_address] ?? [];
+      const additionalConfig =
+        protocol_type === 'beefy_clm_vault'
+          ? {
+              protocol_type,
+              platformId: vault.platformId,
+              beefy_clm_manager: clmVaultConfigs.find(
+                v => v.vault_address === underlying_lp_address
+              ) as BeefyVault,
+            }
+          : { protocol_type, platformId: vault.platformId };
+      const reward_pools = vaultRewardPoolDataPerVaultAddress[vault_address] ?? [];
+      const boosts = boostPerUnderlyingAddress[vault_address] ?? [];
 
-    const underlyingPlatform = vault.platformId ?? null;
+      const underlyingPlatform = vault.platformId ?? null;
 
-    return {
-      id: vault.id,
-      vault_address,
-      chain: vault.chain,
-      vault_token_symbol: vault.earnedToken,
-      ...additionalConfig,
-      underlyingPlatform,
-      strategy_address: vault.strategy.toLocaleLowerCase() as Hex,
-      undelying_lp_address: underlying_lp_address,
-      status: vault.status,
-      reward_pools: reward_pools.map(pool => ({
-        id: pool.id,
-        clm_address: pool.tokenAddress.toLocaleLowerCase() as Hex,
-        reward_pool_address: pool.earnContractAddress.toLocaleLowerCase() as Hex,
-      })),
-      boosts: boosts.map(boost => ({
-        id: boost.id,
-        boost_address: boost.earnedTokenAddress.toLocaleLowerCase() as Hex,
-        underlying_address: boost.tokenAddress.toLocaleLowerCase() as Hex,
-      })),
-      pointStructureIds: vault.pointStructureIds ?? [],
-    };
-  });
+      return {
+        id: vault.id,
+        vault_address,
+        chain: vault.chain,
+        vault_token_symbol: vault.earnedToken,
+        ...additionalConfig,
+        underlyingPlatform,
+        strategy_address: vault.strategy.toLocaleLowerCase() as Hex,
+        undelying_lp_address: underlying_lp_address,
+        status: vault.status,
+        reward_pools: reward_pools.map(pool => ({
+          id: pool.id,
+          clm_address: pool.tokenAddress.toLocaleLowerCase() as Hex,
+          reward_pool_address: pool.earnContractAddress.toLocaleLowerCase() as Hex,
+        })),
+        boosts: boosts.map(boost => ({
+          id: boost.id,
+          boost_address: boost.earnedTokenAddress.toLocaleLowerCase() as Hex,
+          underlying_address: boost.tokenAddress.toLocaleLowerCase() as Hex,
+        })),
+        pointStructureIds: vault.pointStructureIds ?? [],
+      };
+    });
 
   const allConfigs = clmVaultConfigs.concat(mooVaultCofigs);
   return allConfigs;
