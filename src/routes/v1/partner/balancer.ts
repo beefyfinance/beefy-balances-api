@@ -20,26 +20,19 @@ export default async function (
     });
     type UrlParams = Static<typeof urlParamsSchema>;
 
-    const queryParamsSchema = Type.Object({
-      include_eol: Type.Optional(Type.Boolean({ default: false })),
-    });
-    type QueryParams = Static<typeof queryParamsSchema>;
-
     const schema: FastifySchema = {
       tags: ['balancer'],
       params: urlParamsSchema,
-      querystring: queryParamsSchema,
       response: {
         200: Type.Array(Type.Any()),
       },
     };
 
-    instance.get<{ Params: UrlParams; Querystring: QueryParams }>(
+    instance.get<{ Params: UrlParams }>(
       '/config/:chain/:block_number/bundles',
       { schema },
       async (request, reply) => {
         const { chain, block_number } = request.params;
-        const { include_eol } = request.query;
 
         const result = await asyncCache.wrap(
           `balancer:config:${chain}:${block_number}`,
@@ -48,8 +41,7 @@ export default async function (
             const configs = await getBeefyVaultConfig(
               chain,
               vault =>
-                (include_eol ? true : vault.status === 'active') &&
-                (vault.protocol_type === 'balancer_aura' || vault.underlyingPlatform === 'balancer')
+                vault.protocol_type === 'balancer_aura' || vault.underlyingPlatform === 'balancer'
             );
 
             // Get holder balances for each vault

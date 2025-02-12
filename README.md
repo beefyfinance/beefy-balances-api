@@ -79,6 +79,3 @@ http://localhost:4000/api/v1/vault/arbitrum/top-holders?vault_addresses=0x0481ad
 
 https://balance-api.beefy.finance/api/v1/partner/balancer/config/arbitrum/20449610/bundles
 http://localhost:4000/api/v1/partner/balancer/config/arbitrum/20449610/bundles
-
-https://balance-api.beefy.finance/api/v1/partner/balancer/config/arbitrum/20449610/bundles?include_eol=true
-http://localhost:4000/api/v1/partner/balancer/config/arbitrum/20449610/bundles?include_eol=true
