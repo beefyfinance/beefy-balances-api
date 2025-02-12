@@ -49,6 +49,7 @@ export type BeefyBoost = {
 
 export type BeefyProtocolType =
   | 'aave'
+  | 'balancer'
   | 'balancer_aura'
   | 'beefy_clm_vault'
   | 'beefy_clm'
@@ -164,6 +165,10 @@ const protocol_map: Record<ApiPlatformId, BeefyProtocolType> = {
   velodrome: 'solidly',
 };
 
+const platformIdToProtocolType: Record<string, BeefyProtocolType> = {
+  balancer: 'balancer',
+};
+
 export const getBeefyVaultConfig = async (
   chain: ChainId,
   vaultFilter: (vault: BeefyVault) => boolean
@@ -191,7 +196,7 @@ export const getBeefyBreakdownableVaultConfig = async (
   if (notFoundProtocols.length > 0) {
     const messages = notFoundProtocols.map(
       v =>
-        `Unknown platformId ${v.platformId} for vault ${v.id}. Devs need to implement breakdown for this protocol`
+        `Vault ${v.id} with platformId ${v.platformId} has no protocol type. Devs need to implement breakdown for this protocol.`
     );
     throw new FriendlyError(messages.join('\n'));
   }
@@ -240,11 +245,18 @@ const getAllConfigs = async (chain: ChainId): Promise<BeefyVault[]> => {
     const undelying_lp_address = vault.tokenAddress.toLocaleLowerCase() as Hex;
     const vault_address = vault.earnedTokenAddress.toLocaleLowerCase() as Hex;
 
-    const protocol_type: BeefyProtocolType | undefined =
+    let protocol_type: BeefyProtocolType | undefined =
       vault.type === 'cowcentrated' ? 'beefy_clm' : protocol_map[vault.platformId];
+    if (!protocol_type) {
+      const mappedProtocolType = platformIdToProtocolType[vault.platformId];
+      if (mappedProtocolType) {
+        protocol_type = mappedProtocolType;
+      }
+    }
     if (protocol_type === 'beefy_clm_vault') {
       throw new FriendlyError('Invalid protocol');
     }
+
     const reward_pools = clmRewardPoolDataPerClmAddress[vault_address] ?? [];
 
     const boosts = boostPerUnderlyingAddress[vault_address] ?? [];
@@ -296,11 +308,18 @@ const getAllConfigs = async (chain: ChainId): Promise<BeefyVault[]> => {
         throw new FriendlyError(`Missing "tokenAddress" field for vault ${vault.id}.`);
       }
 
-      const protocol_type: BeefyProtocolType | undefined = clmManagerAddresses.has(
+      let protocol_type: BeefyProtocolType | undefined = clmManagerAddresses.has(
         underlying_lp_address
       )
         ? 'beefy_clm_vault'
         : protocol_map[vault.platformId];
+
+      if (!protocol_type) {
+        const mappedProtocolType = platformIdToProtocolType[vault.platformId];
+        if (mappedProtocolType) {
+          protocol_type = mappedProtocolType;
+        }
+      }
 
       const additionalConfig =
         protocol_type === 'beefy_clm_vault'

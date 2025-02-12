@@ -18,6 +18,7 @@ type BreakdownMethod = (
 
 const breakdownMethods: Record<BeefyProtocolType, BreakdownMethod> = {
   aave: getAaveVaultBreakdown,
+  balancer: getBalancerAuraVaultBreakdown,
   balancer_aura: getBalancerAuraVaultBreakdown,
   beefy_clm_vault: getBeefyClmVaultBreakdown,
   beefy_clm: getBeefyClmManagerBreakdown,
