@@ -10,12 +10,16 @@ query TokenBalance(
   $orderBy: TokenBalance_orderBy = id
   $orderDirection: OrderDirection = desc
 ) {
-  tokens(first: $tokenFirst, skip: $tokenSkip, where: { id_in: $token_in_1 }) {
+  tokens(
+    block: { number: $block }
+    first: $tokenFirst
+    skip: $tokenSkip
+    where: { id_in: $token_in_1 }
+  ) {
     id
     name
     decimals
     symbol
-
     balances(
       orderBy: $orderBy
       orderDirection: $orderDirection

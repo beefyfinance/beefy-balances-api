@@ -52,7 +52,7 @@
     "viem": "^2.23.2"
   },
   "lint-staged": {
-    "src/**/*.{ts,graphql,json}": "biome check --write"
+    "src/**/*.{ts,json}": "biome check --write"
   },
   "devDependencies": {
     "@biomejs/biome": "1.8.2",
