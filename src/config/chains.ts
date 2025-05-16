@@ -22,6 +22,7 @@ export enum ChainId {
   polygon = 'polygon',
   rootstock = 'rootstock',
   scroll = 'scroll',
+  saga = 'saga',
   sei = 'sei',
   sonic = 'sonic',
   unichain = 'unichain',
