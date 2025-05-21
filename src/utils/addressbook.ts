@@ -18,7 +18,15 @@ export const getWNativeToken = (chainId: ChainId): Token => {
   return token;
 };
 
+export const getNativeTokenSymbol = (chainId: ChainId): string => {
+  return addressBook[chainId]?.native.symbol;
+}
+
 export const isNativeToken = (chainId: ChainId, symbol: string) => {
+  if (symbol === getNativeTokenSymbol(chainId)) {
+    return true;
+  }
+
   const wnative = getWNativeToken(chainId);
   return `W${symbol}` === wnative.symbol || symbol === 'ETH';
 };
