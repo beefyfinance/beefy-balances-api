@@ -39,7 +39,7 @@
     "@sinclair/typebox": "^0.32.33",
     "@types/lodash-es": "^4.17.12",
     "async-lock": "^1.4.1",
-    "blockchain-addressbook": "^0.54.6",
+    "blockchain-addressbook": "^0.54.14",
     "decimal.js": "^10.4.3",
     "dotenv": "^16.4.5",
     "fastify": "^4.26.2",
