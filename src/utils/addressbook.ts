@@ -20,7 +20,7 @@ export const getWNativeToken = (chainId: ChainId): Token => {
 
 export const getNativeTokenSymbol = (chainId: ChainId): string => {
   return addressBook[chainId]?.native.symbol;
-}
+};
 
 export const isNativeToken = (chainId: ChainId, symbol: string) => {
   if (symbol === getNativeTokenSymbol(chainId)) {
