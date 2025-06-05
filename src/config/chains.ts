@@ -11,6 +11,7 @@ export enum ChainId {
   fantom = 'fantom',
   fraxtal = 'fraxtal',
   gnosis = 'gnosis',
+  hyperevm = 'hyperevm',
   linea = 'linea',
   lisk = 'lisk',
   manta = 'manta',
