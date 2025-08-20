@@ -26,7 +26,6 @@ export enum ChainId {
   saga = 'saga',
   sei = 'sei',
   sonic = 'sonic',
-  unichain = 'unichain',
   zksync = 'zksync',
 }
 

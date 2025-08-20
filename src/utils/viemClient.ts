@@ -24,7 +24,6 @@ import {
   scroll,
   sei,
   sonic,
-  unichain,
   zksync,
 } from 'viem/chains';
 import type { ChainId } from '../config/chains';
@@ -80,7 +79,6 @@ const mapping: Record<ChainId, ViemChain> = {
   scroll: scroll,
   sei: sei,
   sonic: sonic,
-  unichain: unichain,
   zksync: zksync,
 };
 
