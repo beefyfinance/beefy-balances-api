@@ -2,6 +2,7 @@ query TokenBalance(
   $token_in_1: [Bytes!]!
   $token_in_2: [String!]!
   $account_not_in: [String!]!
+  $amount_gt: BigInt!
   $block: Int
   $tokenFirst: Int = 1000
   $tokenSkip: Int = 0
@@ -26,7 +27,7 @@ query TokenBalance(
       first: $first
       skip: $skip
       where: {
-        amount_gt: 0
+        amount_gt: $amount_gt
         token_in: $token_in_2
         account_not_in: $account_not_in
       }

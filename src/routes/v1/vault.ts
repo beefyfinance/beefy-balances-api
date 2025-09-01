@@ -29,19 +29,26 @@ export default async function (
     });
     type UrlParams = Static<typeof urlParamsSchema>;
 
+    const queryParamsSchema = Type.Object({
+      balance_gt: Type.Optional(bigintSchema),
+    });
+    type QueryParams = Static<typeof queryParamsSchema>;
+
     const schema: FastifySchema = {
       tags: ['vault'],
       params: urlParamsSchema,
+      querystring: queryParamsSchema,
       response: {
         200: vaultHoldersSchema,
       },
     };
 
-    instance.get<{ Params: UrlParams }>(
+    instance.get<{ Params: UrlParams; Querystring: QueryParams }>(
       '/:chain/:vault_id/:block_number/share-tokens-balances',
       { schema },
       async (request, reply) => {
         const { chain, vault_id: input_vault_id, block_number } = request.params;
+        const { balance_gt } = request.query;
         const vault_id = input_vault_id.replace(/-(rp|vault)$/, '');
 
         if (vault_id !== input_vault_id) {
@@ -53,9 +60,15 @@ export default async function (
         }
 
         const result = await asyncCache.wrap(
-          `vault:${chain}:${vault_id}:${block_number}:holders`,
+          `vault:${chain}:${vault_id}:${block_number}:${balance_gt}:holders`,
           5 * 60 * 1000,
-          async () => await getVaultHolders(chain, vault_id, BigInt(block_number))
+          async () =>
+            await getVaultHolders(
+              chain,
+              vault_id,
+              BigInt(block_number),
+              balance_gt ? BigInt(balance_gt) : 0n
+            )
         );
         reply.send(result);
       }
@@ -71,19 +84,26 @@ export default async function (
     });
     type UrlParams = Static<typeof urlParamsSchema>;
 
+    const queryParamsSchema = Type.Object({
+      balance_gt: Type.Optional(bigintSchema),
+    });
+    type QueryParams = Static<typeof queryParamsSchema>;
+
     const schema: FastifySchema = {
       tags: ['vault'],
       params: urlParamsSchema,
+      querystring: queryParamsSchema,
       response: {
         200: vaultHoldersSchema,
       },
     };
 
-    instance.get<{ Params: UrlParams }>(
+    instance.get<{ Params: UrlParams; Querystring: QueryParams }>(
       '/:chain/:vault_id/:block_number/bundle-holder-share',
       { schema },
       async (request, reply) => {
         const { chain, vault_id: input_vault_id, block_number } = request.params;
+        const { balance_gt } = request.query;
         const base_vault_id = input_vault_id.replace(/-(rp)$/, '');
 
         if (base_vault_id !== input_vault_id) {
@@ -95,13 +115,14 @@ export default async function (
         }
 
         const result = await asyncCache.wrap(
-          `vault:${chain}:${base_vault_id}:${block_number}:holders`,
+          `vault:${chain}:${base_vault_id}:${block_number}:${balance_gt}:holders`,
           5 * 60 * 1000,
           async () =>
             getVaultHoldersAsBaseVaultEquivalentForVaultId(
               chain,
               base_vault_id,
-              BigInt(block_number)
+              BigInt(block_number),
+              balance_gt ? BigInt(balance_gt) : 0n
             )
         );
 
@@ -119,28 +140,36 @@ export default async function (
     });
     type UrlParams = Static<typeof urlParamsSchema>;
 
+    const queryParamsSchema = Type.Object({
+      balance_gt: Type.Optional(bigintSchema),
+    });
+    type QueryParams = Static<typeof queryParamsSchema>;
+
     const schema: FastifySchema = {
       tags: ['vault'],
       params: urlParamsSchema,
+      querystring: queryParamsSchema,
       response: {
         200: vaultHoldersSchema,
       },
     };
 
-    instance.get<{ Params: UrlParams }>(
+    instance.get<{ Params: UrlParams; Querystring: QueryParams }>(
       '/:chain/:vault_address/:block_number/bundle-holder-share-by-vault-address',
       { schema },
       async (request, reply) => {
         const { chain, vault_address, block_number } = request.params;
+        const { balance_gt } = request.query;
 
         const result = await asyncCache.wrap(
-          `vault:${chain}:${vault_address.toLowerCase()}:${block_number}:holders`,
+          `vault:${chain}:${vault_address.toLowerCase()}:${block_number}:${balance_gt}:holders`,
           5 * 60 * 1000,
           async () =>
             getVaultHoldersAsBaseVaultEquivalentForVaultAddress(
               chain,
               vault_address as Hex,
-              BigInt(block_number)
+              BigInt(block_number),
+              balance_gt ? BigInt(balance_gt) : 0n
             )
         );
 
@@ -158,28 +187,36 @@ export default async function (
     });
     type UrlParams = Static<typeof urlParamsSchema>;
 
+    const queryParamsSchema = Type.Object({
+      balance_gt: Type.Optional(bigintSchema),
+    });
+    type QueryParams = Static<typeof queryParamsSchema>;
+
     const schema: FastifySchema = {
       tags: ['vault'],
       params: urlParamsSchema,
+      querystring: queryParamsSchema,
       response: {
         200: vaultHoldersSchema,
       },
     };
 
-    instance.get<{ Params: UrlParams }>(
+    instance.get<{ Params: UrlParams; Querystring: QueryParams }>(
       '/:chain/:strategy_address/:block_number/bundle-holder-share-by-strategy-address',
       { schema },
       async (request, reply) => {
         const { chain, strategy_address, block_number } = request.params;
+        const { balance_gt } = request.query;
 
         const result = await asyncCache.wrap(
-          `vault:${chain}:${strategy_address.toLowerCase()}:${block_number}:holders`,
+          `vault:${chain}:${strategy_address.toLowerCase()}:${block_number}:${balance_gt}:holders`,
           5 * 60 * 1000,
           async () =>
             getVaultHoldersAsBaseVaultEquivalentForStrategyAddress(
               chain,
               strategy_address as Hex,
-              BigInt(block_number)
+              BigInt(block_number),
+              balance_gt ? BigInt(balance_gt) : 0n
             )
         );
 

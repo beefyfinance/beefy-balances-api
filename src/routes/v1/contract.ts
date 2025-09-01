@@ -146,6 +146,7 @@ const getContractHolders = async (
                   first,
                   block: Number(block),
                   account_not_in: ['0x0000000000000000000000000000000000000000'], // empty list returns nothing
+                  amount_gt: '0',
                   token_in_1: [contract_address],
                   token_in_2: [contract_address],
                 }),
