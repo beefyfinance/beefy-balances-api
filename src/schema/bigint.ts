@@ -2,8 +2,8 @@ import { Type } from '@sinclair/typebox';
 
 export const bigintSchema = Type.String({
   minLength: 1,
-  pattern: '^[1-9][0-9]*',
-  examples: ['195190029'],
+  pattern: '^-?[1-9][0-9]*',
+  examples: ['195190029', '-195190029'],
 });
 
 export const bigDecimalSchema = Type.String({
