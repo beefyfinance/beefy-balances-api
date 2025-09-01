@@ -327,7 +327,7 @@ const getAllConfigs = async (chain: ChainId): Promise<BeefyVault[]> => {
               protocol_type,
               platformId: vault.platformId,
               beefy_clm_manager: clmVaultConfigs.find(
-                v => v.vault_address === underlying_lp_address
+                v => v.vault_address.toLowerCase() === underlying_lp_address.toLowerCase()
               ) as BeefyVault,
             }
           : { protocol_type, platformId: vault.platformId };

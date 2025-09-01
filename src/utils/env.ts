@@ -1,3 +1,5 @@
+import { FriendlyError } from './error';
+
 export function getNumberEnv(key: string, defaultValue: number): number {
   const value = process.env[key];
   if (value === undefined || value.length === 0) {
@@ -25,7 +27,7 @@ export function getLogLevelEnv(key: string, defaultValue: string): string {
 export function getRequiredStringEnv(key: string): string {
   const value = process.env[key];
   if (value === undefined || value.length === 0) {
-    throw new Error(`Missing required environment variable: ${key}`);
+    throw new FriendlyError(`Missing required environment variable: ${key}`);
   }
 
   return value;

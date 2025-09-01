@@ -1,4 +1,5 @@
 import type { ChainId } from '../config/chains';
+import { FriendlyError } from './error';
 
 type FactoryFn<P, R> = (...props: P[]) => R;
 
@@ -13,7 +14,7 @@ export function createCachedFactory<P, R>(
       cache[index] = factoryFn(...args);
     }
     if (!cache[index]) {
-      throw new Error(`Factory function returned undefined for key: ${index}`);
+      throw new FriendlyError(`Factory function returned undefined for key: ${index}`);
     }
     return cache[index];
   };

@@ -1,4 +1,5 @@
 import { Type } from '@sinclair/typebox';
+import { FriendlyError } from '../utils/error';
 import { StringEnum } from '../utils/typebox';
 
 export enum Period {
@@ -20,7 +21,7 @@ const periodToSeconds = {
 export function getPeriodSeconds(period: Period) {
   const seconds = periodToSeconds[period];
   if (seconds === undefined) {
-    throw new Error(`Unknown period: ${period}`);
+    throw new FriendlyError(`Unknown period: ${period}`);
   }
   return seconds;
 }

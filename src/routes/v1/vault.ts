@@ -134,7 +134,7 @@ export default async function (
         const { chain, vault_address, block_number } = request.params;
 
         const result = await asyncCache.wrap(
-          `vault:${chain}:${vault_address}:${block_number}:holders`,
+          `vault:${chain}:${vault_address.toLowerCase()}:${block_number}:holders`,
           5 * 60 * 1000,
           async () =>
             getVaultHoldersAsBaseVaultEquivalentForVaultAddress(
@@ -173,7 +173,7 @@ export default async function (
         const { chain, strategy_address, block_number } = request.params;
 
         const result = await asyncCache.wrap(
-          `vault:${chain}:${strategy_address}:${block_number}:holders`,
+          `vault:${chain}:${strategy_address.toLowerCase()}:${block_number}:holders`,
           5 * 60 * 1000,
           async () =>
             getVaultHoldersAsBaseVaultEquivalentForStrategyAddress(

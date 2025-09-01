@@ -1,4 +1,5 @@
 import { type Hex, getContract } from 'viem';
+import { FriendlyError } from '../../../utils/error';
 import type { BeefyViemClient } from '../../../utils/viemClient';
 import { BeefyClmStrategyAbi } from '../../abi/BeefyClmStrategy';
 import { BeefyVaultConcLiqAbi } from '../../abi/BeefyVaultConcLiq';
@@ -58,7 +59,7 @@ export const getBeefyClmVaultBreakdown = async (
   vault: BeefyVault
 ): Promise<BeefyVaultBreakdown> => {
   if (vault.protocol_type !== 'beefy_clm_vault') {
-    throw new Error(`Invalid protocol type ${vault.protocol_type}`);
+    throw new FriendlyError(`Invalid protocol type ${vault.protocol_type}`);
   }
 
   const underlyingClmBreakdown = await getBeefyClmManagerBreakdown(

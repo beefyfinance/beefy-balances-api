@@ -7,6 +7,7 @@ import {
   type BeefyVault,
   getBeefyBreakdownableVaultConfig,
 } from '../vault-breakdown/vault/getBeefyVaultConfig';
+import { FriendlyError } from './error';
 import { getSdksForChain, paginate } from './sdk';
 
 // Define schemas
@@ -29,13 +30,13 @@ export const getVaultHoldersAsBaseVaultEquivalentForVaultAddress = async (
   // first get the addresses linked to that vault id
   const configs = await getBeefyBreakdownableVaultConfig(
     chainId,
-    vault => vault.vault_address === vault_address
+    vault => vault.vault_address.toLowerCase() === vault_address.toLowerCase()
   );
   if (!configs.length) {
-    throw new Error(`Vault with "vault_address" ${vault_address} not found`);
+    throw new FriendlyError(`Vault with "vault_address" ${vault_address} not found`);
   }
   if (configs.length > 1) {
-    throw new Error(`Vault with "vault_address" ${vault_address} is not unique`);
+    throw new FriendlyError(`Vault with "vault_address" ${vault_address} is not unique`);
   }
 
   return _getVaultHoldersAsBaseVaultEquivalent(chainId, configs[0], block);
@@ -52,10 +53,10 @@ export const getVaultHoldersAsBaseVaultEquivalentForStrategyAddress = async (
     vault => vault.strategy_address.toLowerCase() === strategy_address.toLowerCase()
   );
   if (!configs.length) {
-    throw new Error(`Vault with "strategy_address" ${strategy_address} not found`);
+    throw new FriendlyError(`Vault with "strategy_address" ${strategy_address} not found`);
   }
   if (configs.length > 1) {
-    throw new Error(`Vault with "strategy_address" ${strategy_address} is not unique`);
+    throw new FriendlyError(`Vault with "strategy_address" ${strategy_address} is not unique`);
   }
 
   return _getVaultHoldersAsBaseVaultEquivalent(chainId, configs[0], block);
@@ -69,10 +70,10 @@ export const getVaultHoldersAsBaseVaultEquivalentForVaultId = async (
   // first get the addresses linked to that vault id
   const configs = await getBeefyBreakdownableVaultConfig(chainId, vault => vault.id === vault_id);
   if (!configs.length) {
-    throw new Error(`Vault with "id" ${vault_id} not found`);
+    throw new FriendlyError(`Vault with "id" ${vault_id} not found`);
   }
   if (configs.length > 1) {
-    throw new Error(`Vault with "id" ${vault_id} is not unique`);
+    throw new FriendlyError(`Vault with "id" ${vault_id} is not unique`);
   }
 
   return _getVaultHoldersAsBaseVaultEquivalent(chainId, configs[0], block);
@@ -139,13 +140,13 @@ const _getVaultHoldersAsBaseVaultEquivalent = async (
       chainRes.flatMap(tokenPage =>
         tokenPage.data.tokens.map(token => {
           if (!token.symbol) {
-            throw new Error(`Token ${token.id} has no symbol`);
+            throw new FriendlyError(`Token ${token.id} has no symbol`);
           }
           if (!token.decimals) {
-            throw new Error(`Token ${token.id} has no decimals`);
+            throw new FriendlyError(`Token ${token.id} has no decimals`);
           }
           if (!token.name) {
-            throw new Error(`Token ${token.id} has no name`);
+            throw new FriendlyError(`Token ${token.id} has no name`);
           }
 
           return {
@@ -393,13 +394,13 @@ export const getVaultHolders = async (
     chainRes.flatMap(tokenPage =>
       tokenPage.data.tokens.map(token => {
         if (!token.symbol) {
-          throw new Error(`Token ${token.id} has no symbol`);
+          throw new FriendlyError(`Token ${token.id} has no symbol`);
         }
         if (!token.decimals) {
-          throw new Error(`Token ${token.id} has no decimals`);
+          throw new FriendlyError(`Token ${token.id} has no decimals`);
         }
         if (!token.name) {
-          throw new Error(`Token ${token.id} has no name`);
+          throw new FriendlyError(`Token ${token.id} has no name`);
         }
 
         return {

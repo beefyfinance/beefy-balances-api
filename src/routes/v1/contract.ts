@@ -40,7 +40,7 @@ export default async function (
       async (request, reply) => {
         const { chain, contract_address: input_contract_address, block_number } = request.params;
         const result = await asyncCache.wrap(
-          `contract:${chain}:${input_contract_address}:${block_number}:holders`,
+          `contract:${chain}:${input_contract_address.toLowerCase()}:${block_number}:holders`,
           5 * 60 * 1000,
           async () => {
             const results = await getContractHolders(
@@ -100,11 +100,11 @@ export default async function (
           !Array.isArray(contract_addresses) ||
           contract_addresses.length === 0
         ) {
-          throw new Error('contract_addresses is required');
+          throw new FriendlyError('contract_addresses is required');
         }
 
         const result = await asyncCache.wrap(
-          `vault:${chain}:${contract_addresses.join(',')}:top-holders:${limit}`,
+          `vault:${chain}:${contract_addresses.join(',').toLowerCase()}:top-holders:${limit}`,
           5 * 60 * 1000,
           async () => await getTopContractHolders(chain, contract_addresses as Hex[], limit)
         );
@@ -161,13 +161,13 @@ const getContractHolders = async (
     chainRes.flatMap(tokenPage =>
       tokenPage.data.tokens.map(token => {
         if (!token.symbol) {
-          throw new Error(`Token ${token.id} has no symbol`);
+          throw new FriendlyError(`Token ${token.id} has no symbol`);
         }
         if (!token.decimals) {
-          throw new Error(`Token ${token.id} has no decimals`);
+          throw new FriendlyError(`Token ${token.id} has no decimals`);
         }
         if (!token.name) {
-          throw new Error(`Token ${token.id} has no name`);
+          throw new FriendlyError(`Token ${token.id} has no name`);
         }
 
         return {
@@ -215,13 +215,13 @@ const getTopContractHolders = async (
   return res.flatMap(chainRes =>
     chainRes.data.tokens.map(token => {
       if (!token.symbol) {
-        throw new Error(`Token ${token.id} has no symbol`);
+        throw new FriendlyError(`Token ${token.id} has no symbol`);
       }
       if (!token.decimals) {
-        throw new Error(`Token ${token.id} has no decimals`);
+        throw new FriendlyError(`Token ${token.id} has no decimals`);
       }
       if (!token.name) {
-        throw new Error(`Token ${token.id} has no name`);
+        throw new FriendlyError(`Token ${token.id} has no name`);
       }
 
       return {

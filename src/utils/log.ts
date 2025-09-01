@@ -1,5 +1,6 @@
 import { type Logger, type LoggerOptions, pino } from 'pino';
 import { API_ENV, LOG_LEVEL } from '../config/env';
+import { FriendlyError } from './error';
 
 const loggers: Record<string, Logger> = {};
 
@@ -25,7 +26,7 @@ export function getLoggerFor(name: string, extraOptions: LoggerOptions = {}) {
   }
 
   if (!loggers[name]) {
-    throw new Error(`Failed to get logger for ${name}`);
+    throw new FriendlyError(`Failed to get logger for ${name}`);
   }
 
   return loggers[name];
