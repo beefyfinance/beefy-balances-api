@@ -20,6 +20,7 @@ export enum ChainId {
   mode = 'mode',
   moonbeam = 'moonbeam',
   optimism = 'optimism',
+  plasma = 'plasma',
   polygon = 'polygon',
   rootstock = 'rootstock',
   scroll = 'scroll',
