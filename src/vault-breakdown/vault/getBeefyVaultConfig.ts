@@ -1,7 +1,6 @@
 import { groupBy } from 'lodash';
 import type { Hex } from 'viem';
 import type { ChainId } from '../../config/chains';
-
 import { getWNativeToken, isNativeToken } from '../../utils/addressbook';
 import { getAsyncCache } from '../../utils/async-lock';
 import { FriendlyError } from '../../utils/error';
@@ -23,7 +22,7 @@ export type BeefyVault = {
   boosts: BeefyBoost[];
   pointStructureIds: string[];
   platformId: ApiPlatformId;
-  status: 'active' | 'eol';
+  is_active: boolean;
   underlyingPlatform: string | null;
 } & (
   | {
@@ -49,29 +48,39 @@ export type BeefyBoost = {
 
 export type BeefyProtocolType =
   | 'aave'
-  | 'balancer'
   | 'balancer_aura'
+  | 'balancer'
   | 'beefy_clm_vault'
   | 'beefy_clm'
   | 'curve'
   | 'gamma'
   | 'ichi'
+  | 'infrared'
+  | 'euler'
   | 'pendle_equilibria'
   | 'solidly';
 
 type ApiPlatformId =
   | 'aerodrome'
   | 'aura'
+  | 'balancer'
   | 'beefy'
+  | 'beethovenx'
   | 'curve'
+  | 'convex'
   | 'equilibria'
+  | 'equalizer'
   | 'gamma'
   | 'ichi'
+  | 'infrared'
   | 'lendle'
   | 'lynex'
   | 'magpie'
   | 'mendi'
+  | 'silo'
   | 'nile'
+  | 'euler'
+  | 'swapx'
   | 'velodrome';
 
 export type ApiStrategyTypeId = 'lp' | 'multi-lp' | 'multi-lp-locked' | 'cowcentrated';
@@ -152,17 +161,25 @@ export type ApiBoost = {
 const protocol_map: Record<ApiPlatformId, BeefyProtocolType> = {
   aerodrome: 'solidly',
   aura: 'balancer_aura',
+  balancer: 'balancer',
   beefy: 'beefy_clm',
   curve: 'curve',
+  convex: 'curve',
   equilibria: 'pendle_equilibria',
+  equalizer: 'solidly',
   gamma: 'gamma',
   ichi: 'ichi',
+  infrared: 'infrared',
   lendle: 'aave',
   lynex: 'solidly',
   magpie: 'pendle_equilibria',
   mendi: 'aave',
   nile: 'solidly',
   velodrome: 'solidly',
+  swapx: 'ichi',
+  beethovenx: 'balancer_aura',
+  silo: 'balancer',
+  euler: 'euler',
 };
 
 const platformIdToProtocolType: Record<string, BeefyProtocolType> = {
@@ -196,7 +213,7 @@ export const getBeefyBreakdownableVaultConfig = async (
   if (notFoundProtocols.length > 0) {
     const messages = notFoundProtocols.map(
       v =>
-        `Vault ${v.id} with platformId ${v.platformId} has no protocol type. Devs need to implement breakdown for this protocol.`
+        `Unknown platformId ${v.platformId} for vault ${v.id}. Devs need to implement breakdown for this protocol`
     );
     throw new FriendlyError(messages.join('\n'));
   }
@@ -264,12 +281,12 @@ const getAllConfigs = async (chain: ChainId): Promise<BeefyVault[]> => {
 
     return {
       id: vault.id,
+      is_active: vault.status === 'active',
       vault_address,
       chain: vault.chain,
       vault_token_symbol: vault.earnedToken,
       protocol_type,
       platformId: vault.platformId,
-      status: vault.status,
       strategy_address: vault.strategy.toLocaleLowerCase() as Hex,
       undelying_lp_address,
       underlyingPlatform,
@@ -338,6 +355,7 @@ const getAllConfigs = async (chain: ChainId): Promise<BeefyVault[]> => {
 
       return {
         id: vault.id,
+        is_active: vault.status === 'active',
         vault_address,
         chain: vault.chain,
         vault_token_symbol: vault.earnedToken,
@@ -345,7 +363,6 @@ const getAllConfigs = async (chain: ChainId): Promise<BeefyVault[]> => {
         underlyingPlatform,
         strategy_address: vault.strategy.toLocaleLowerCase() as Hex,
         undelying_lp_address: underlying_lp_address,
-        status: vault.status,
         reward_pools: reward_pools.map(pool => ({
           id: pool.id,
           clm_address: pool.tokenAddress.toLocaleLowerCase() as Hex,

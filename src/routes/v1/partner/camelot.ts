@@ -46,8 +46,7 @@ export default async function (
           const configs = await getBeefyVaultConfig(
             chain,
             vault =>
-              (include_eol ? true : vault.status === 'active') &&
-              vault.underlyingPlatform === 'camelot'
+              (include_eol ? true : vault.is_active) && vault.underlyingPlatform === 'camelot'
           );
 
           // remove clm vault from top levels if a vault exists on top

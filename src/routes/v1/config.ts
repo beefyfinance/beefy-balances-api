@@ -46,9 +46,7 @@ export default async function (
           `config:${chain}`,
           5 * 60 * 1000,
           async () =>
-            await getBeefyVaultConfig(chain, vault =>
-              include_eol ? true : vault.status === 'active'
-            )
+            await getBeefyVaultConfig(chain, vault => (include_eol ? true : vault.is_active))
         );
         reply.send(result);
       }
@@ -88,7 +86,7 @@ export default async function (
 
         const result = await asyncCache.wrap(`config:${chain}`, 5 * 60 * 1000, async () => {
           const configs = await getBeefyVaultConfig(chain, vault =>
-            include_eol ? true : vault.status === 'active'
+            include_eol ? true : vault.is_active
           );
 
           // remove clm vault from top levels if a vault exists on top
