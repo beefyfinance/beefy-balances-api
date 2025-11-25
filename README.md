@@ -6,8 +6,8 @@ Access api for the CLM subgraph: https://github.com/beefyfinance/beefy-balances-
 ## add a new chain
 
 - Add the chain to `src/config/chains.ts`
-- update `src/utils/viemClient.ts`
 - `npm run update:addressbook` 
+- update `src/utils/viemClient.ts`
 - `npm run test:ts` and fix errs
 - `npm run format:fix`
 - `npm run dev` 

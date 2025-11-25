@@ -38,7 +38,7 @@
     "@sinclair/typebox": "^0.32.33",
     "@types/lodash-es": "^4.17.12",
     "async-lock": "^1.4.1",
-    "blockchain-addressbook": "^0.54.77",
+    "blockchain-addressbook": "^0.54.100",
     "decimal.js": "^10.4.3",
     "dotenv": "^16.4.5",
     "fastify": "^4.26.2",
@@ -48,7 +48,7 @@
     "lodash": "^4.17.21",
     "node-cache": "^5.1.2",
     "pino": "^8.19.0",
-    "viem": "^2.37.8"
+    "viem": "^2.40.3"
   },
   "lint-staged": {
     "src/**/*.{ts,json}": "biome check --write"
