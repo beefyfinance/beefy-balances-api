@@ -90,6 +90,7 @@ export type ApiVault = {
   name: string;
   status: 'active' | 'eol';
   earnedTokenAddress: string;
+  earnContractAddress: string;
   depositTokenAddresses?: string[];
   chain: string;
   platformId: ApiPlatformId;
@@ -248,7 +249,7 @@ const getAllConfigs = async (chain: ChainId): Promise<BeefyVault[]> => {
     ]);
 
   const clmManagerAddresses = new Set(
-    cowVaultsData.map(v => v.earnedTokenAddress.toLocaleLowerCase())
+    cowVaultsData.map(v => v.earnContractAddress.toLocaleLowerCase())
   );
   const boostPerUnderlyingAddress = groupBy(boostData, b => b.tokenAddress?.toLocaleLowerCase());
   const vaultRewardPoolDataPerVaultAddress = groupBy(vaultRewardPoolData, v =>
@@ -260,7 +261,7 @@ const getAllConfigs = async (chain: ChainId): Promise<BeefyVault[]> => {
 
   const clmVaultConfigs = cowVaultsData.map((vault): BeefyVault => {
     const undelying_lp_address = vault.tokenAddress.toLocaleLowerCase() as Hex;
-    const vault_address = vault.earnedTokenAddress.toLocaleLowerCase() as Hex;
+    const vault_address = vault.earnContractAddress.toLocaleLowerCase() as Hex;
 
     let protocol_type: BeefyProtocolType | undefined =
       vault.type === 'cowcentrated' ? 'beefy_clm' : protocol_map[vault.platformId];
@@ -297,7 +298,7 @@ const getAllConfigs = async (chain: ChainId): Promise<BeefyVault[]> => {
       })),
       boosts: boosts.map(boost => ({
         id: boost.id,
-        boost_address: boost.earnedTokenAddress.toLocaleLowerCase() as Hex,
+        boost_address: boost.earnContractAddress.toLocaleLowerCase() as Hex,
         underlying_address: boost.tokenAddress.toLocaleLowerCase() as Hex,
       })),
       pointStructureIds: vault.pointStructureIds ?? [],
@@ -311,7 +312,7 @@ const getAllConfigs = async (chain: ChainId): Promise<BeefyVault[]> => {
     })
     .map((vault): BeefyVault => {
       let underlying_lp_address = vault.tokenAddress?.toLocaleLowerCase() as Hex | undefined;
-      const vault_address = vault.earnedTokenAddress.toLocaleLowerCase() as Hex;
+      const vault_address = vault.earnContractAddress.toLocaleLowerCase() as Hex;
 
       if (
         !underlying_lp_address &&
@@ -370,7 +371,7 @@ const getAllConfigs = async (chain: ChainId): Promise<BeefyVault[]> => {
         })),
         boosts: boosts.map(boost => ({
           id: boost.id,
-          boost_address: boost.earnedTokenAddress.toLocaleLowerCase() as Hex,
+          boost_address: boost.earnContractAddress.toLocaleLowerCase() as Hex,
           underlying_address: boost.tokenAddress.toLocaleLowerCase() as Hex,
         })),
         pointStructureIds: vault.pointStructureIds ?? [],
