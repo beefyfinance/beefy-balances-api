@@ -58,7 +58,8 @@ export type BeefyProtocolType =
   | 'infrared'
   | 'euler'
   | 'pendle_equilibria'
-  | 'solidly';
+  | 'solidly'
+  | 'want_balance_only';
 
 type ApiPlatformId =
   | 'aerodrome'
@@ -81,7 +82,8 @@ type ApiPlatformId =
   | 'nile'
   | 'euler'
   | 'swapx'
-  | 'velodrome';
+  | 'velodrome'
+  | 'blackhole';
 
 export type ApiStrategyTypeId = 'lp' | 'multi-lp' | 'multi-lp-locked' | 'cowcentrated';
 
@@ -181,6 +183,7 @@ const protocol_map: Record<ApiPlatformId, BeefyProtocolType> = {
   beethovenx: 'balancer_aura',
   silo: 'balancer',
   euler: 'euler',
+  blackhole: 'want_balance_only',
 };
 
 const platformIdToProtocolType: Record<string, BeefyProtocolType> = {

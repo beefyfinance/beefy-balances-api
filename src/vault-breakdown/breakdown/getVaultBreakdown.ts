@@ -31,6 +31,9 @@ const breakdownMethods: Record<BeefyProtocolType, BreakdownMethod> = {
   euler: getEulerVaultBreakdown,
   pendle_equilibria: getPendleVaultBreakdown,
   solidly: getSolidlyVaultBreakdown,
+  want_balance_only: () => {
+    throw new Error('Want balance only breakdown is not implemented');
+  },
 };
 
 export const getVaultBreakdowns = async (
