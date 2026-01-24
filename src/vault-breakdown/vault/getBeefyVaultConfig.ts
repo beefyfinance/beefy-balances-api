@@ -313,7 +313,7 @@ const getAllConfigs = async (chain: ChainId): Promise<BeefyVault[]> => {
       const dropEol = ['aave-matic-eol'];
       return !dropEol.includes(vault.id);
     })
-    .map((vault): BeefyVault => {
+    .map((vault): BeefyVault | null => {
       let underlying_lp_address = vault.tokenAddress?.toLocaleLowerCase() as Hex | undefined;
       const vault_address = vault.earnContractAddress.toLocaleLowerCase() as Hex;
 
@@ -326,6 +326,11 @@ const getAllConfigs = async (chain: ChainId): Promise<BeefyVault[]> => {
       }
 
       if (!underlying_lp_address) {
+        // vault is eol and does not conform to the expected schema
+        // this is likely an old vault that can be safely ignored
+        if (vault.status === 'eol') {
+          return null;
+        }
         throw new FriendlyError(`Missing "tokenAddress" field for vault ${vault.id}.`);
       }
 
@@ -379,7 +384,8 @@ const getAllConfigs = async (chain: ChainId): Promise<BeefyVault[]> => {
         })),
         pointStructureIds: vault.pointStructureIds ?? [],
       };
-    });
+    })
+    .filter((a): a is BeefyVault => a !== null);
 
   const allConfigs = clmVaultConfigs.concat(mooVaultCofigs);
   return allConfigs;
