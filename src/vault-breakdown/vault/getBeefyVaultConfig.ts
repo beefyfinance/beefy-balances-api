@@ -325,13 +325,10 @@ const getAllConfigs = async (chain: ChainId): Promise<BeefyVault[]> => {
         underlying_lp_address = wnative.address as Hex;
       }
 
+      // missing tokenAddress means wnative
       if (!underlying_lp_address) {
-        // vault is eol and does not conform to the expected schema
-        // this is likely an old vault that can be safely ignored
-        if (vault.status === 'eol') {
-          return null;
-        }
-        throw new FriendlyError(`Missing "tokenAddress" field for vault ${vault.id}.`);
+        const wnative = getWNativeToken(chain);
+        underlying_lp_address = wnative.address as Hex;
       }
 
       let protocol_type: BeefyProtocolType | undefined = clmManagerAddresses.has(
