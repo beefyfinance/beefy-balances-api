@@ -83,7 +83,8 @@ type ApiPlatformId =
   | 'euler'
   | 'swapx'
   | 'velodrome'
-  | 'blackhole';
+  | 'blackhole'
+  | 'pendle';
 
 export type ApiStrategyTypeId = 'lp' | 'multi-lp' | 'multi-lp-locked' | 'cowcentrated';
 
@@ -184,6 +185,7 @@ const protocol_map: Record<ApiPlatformId, BeefyProtocolType> = {
   silo: 'balancer',
   euler: 'euler',
   blackhole: 'want_balance_only',
+  pendle: 'pendle_equilibria',
 };
 
 const platformIdToProtocolType: Record<string, BeefyProtocolType> = {
