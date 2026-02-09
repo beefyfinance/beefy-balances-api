@@ -1,4 +1,4 @@
-import { type Token, addressBook } from 'blockchain-addressbook';
+import { type Token, addressBook } from '@beefyfinance/blockchain-addressbook';
 import type { Hex } from 'viem';
 import type { ChainId } from '../config/chains';
 import { FriendlyError } from './error';
