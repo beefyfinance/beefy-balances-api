@@ -103,8 +103,6 @@ const getLatestBalances = async (address: string): Promise<ChainData[]> => {
     }),
   });
 
-  console.log(JSON.stringify(merged.data, null, 2));
-
   if (!merged.data?.Account_by_pk) return [];
 
   const account = merged.data.Account_by_pk;
