@@ -1,11 +1,14 @@
-query AccountLatestBalance($address: ID!, $first: Int = 1000, $skip: Int = 0) {
-  account(id: $address) {
+query AccountLatestBalance(
+  $address: String!
+  $limit: Int = 1000
+  $offset: Int = 0
+) {
+  Account_by_pk(id: $address) {
     balances(
-      skip: $skip
-      first: $first
-      where: { rawAmount_gt: 0 }
-      orderBy: id
-      orderDirection: asc
+      limit: $limit
+      offset: $offset
+      order_by: { id: asc }
+      where: { amount: { _gt: 0 } }
     ) {
       token {
         id
@@ -14,13 +17,10 @@ query AccountLatestBalance($address: ID!, $first: Int = 1000, $skip: Int = 0) {
         decimals
       }
       amount
-      rawAmount
     }
   }
-  _meta {
-    block {
-      number
-      timestamp
-    }
+  _meta(limit: 1, order_by: { readyAt: desc }) {
+    progressBlock
+    readyAt
   }
 }

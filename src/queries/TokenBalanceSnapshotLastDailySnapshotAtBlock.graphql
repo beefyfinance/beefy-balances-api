@@ -1,0 +1,17 @@
+query TokenBalanceSnapshotLastDailySnapshotAtBlock(
+  $chainId: Int!
+  $block: numeric!
+) {
+  TokenBalanceSnapshot(
+    where: {
+      chainId: { _eq: $chainId }
+      period: { _eq: 86400 }
+      blockNumber: { _lte: $block }
+    }
+    limit: 1
+  ) {
+    roundedTimestamp
+    timestamp
+    blockNumber
+  }
+}

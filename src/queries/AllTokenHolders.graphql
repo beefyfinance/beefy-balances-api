@@ -1,5 +1,5 @@
-query AllTokenHolders($first: Int = 1000, $skip: Int = 0) {
-  tokenStatistics(skip: $skip, first: $first, where: { holderCount_gt: 0 }) {
+query AllTokenHolders($limit: Int = 1000, $offset: Int = 0) {
+  Token(limit: $limit, offset: $offset, order_by: { id: asc }) {
     id
     holderCount
   }

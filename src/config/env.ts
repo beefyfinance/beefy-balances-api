@@ -11,4 +11,5 @@ export const API_CORS_ORIGIN: RegExp = new RegExp(
 );
 export const API_RATE_LIMIT = getNumberEnv('API_RATE_LIMIT', 60); // per minute
 export const LOG_LEVEL = getLogLevelEnv('LOG_LEVEL', 'info');
-export const SUBGRAPH_TAG = process.env.SUBGRAPH_TAG || 'latest';
+export const SUBGRAPH_URL =
+  process.env.SUBGRAPH_URL || 'https://beefyfinance-xxx.dedicated.hyperindex.xyz/v1/graphql';

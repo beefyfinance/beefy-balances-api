@@ -1,0 +1,26 @@
+query TokenBalanceChangesBetweenBlocks(
+  $chainId: Int!
+  $token_in: [String!]!
+  $account_not_in: [String!]!
+  $block_gt: numeric!
+  $block_lte: numeric!
+  $limit: Int = 1000
+  $offset: Int = 0
+) {
+  TokenBalanceChange(
+    limit: $limit
+    offset: $offset
+    where: {
+      chainId: { _eq: $chainId }
+      token_id: { _in: $token_in }
+      account_id: { _nin: $account_not_in }
+      blockNumber: { _gt: $block_gt, _lte: $block_lte }
+    }
+    order_by: { blockNumber: asc }
+  ) {
+    account_id
+    token_id
+    balanceBefore
+    balanceAfter
+  }
+}
