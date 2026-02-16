@@ -1,14 +1,16 @@
 import { type Static, Type } from '@sinclair/typebox';
 import type { FastifyInstance, FastifyPluginOptions, FastifySchema } from 'fastify';
-import { min } from 'lodash';
+import * as R from 'remeda';
 import type { Hex } from 'viem';
 import { type ChainId, chainIdSchema } from '../../config/chains';
-import { OrderDirection, TokenBalance_OrderBy } from '../../queries/codegen/sdk';
+import { Order_By } from '../../queries/codegen/sdk';
 import { addressSchema } from '../../schema/address';
 import { bigintSchema } from '../../schema/bigint';
 import { getAsyncCache } from '../../utils/async-lock';
 import { FriendlyError } from '../../utils/error';
-import { getSdksForChain, paginate } from '../../utils/sdk';
+import { getGlobalSdk, paginate } from '../../utils/sdk';
+import { getAccountId, getTokenId } from '../../utils/subgraph-ids';
+import { getTokenBalancesAtBlock } from '../../utils/token-balance-at-block';
 
 export default async function (
   instance: FastifyInstance,
@@ -132,57 +134,34 @@ const getContractHolders = async (
   contract_address: Hex,
   block: bigint
 ): Promise<ContractHolders> => {
-  const res = (
-    await Promise.all(
-      getSdksForChain(chainId).map(sdk =>
-        paginate({
-          fetchPage: ({ skip: tokenSkip, first: tokenFirst }) =>
-            paginate({
-              fetchPage: ({ skip, first }) =>
-                sdk.TokenBalance({
-                  tokenSkip,
-                  tokenFirst,
-                  skip,
-                  first,
-                  block: Number(block),
-                  account_not_in: ['0x0000000000000000000000000000000000000000'], // empty list returns nothing
-                  amount_gt: '0',
-                  token_in_1: [contract_address],
-                  token_in_2: [contract_address],
-                }),
-              count: res => min(res.data.tokens.map(token => token.balances.length)) ?? 0,
-            }),
-          count: res => min(res.map(chainRes => chainRes.data.tokens.length)) ?? 0,
-        })
-      )
-    )
-  ).flat();
+  const excludeAccounts = ['0x0000000000000000000000000000000000000000'] as Hex[];
+  const { balanceMap, tokenMetadata } = await getTokenBalancesAtBlock({
+    chainId,
+    targetBlock: block,
+    tokenAddresses: [contract_address],
+    excludeAccounts,
+  });
 
-  return res.flatMap(chainRes =>
-    chainRes.flatMap(tokenPage =>
-      tokenPage.data.tokens.map(token => {
-        if (!token.symbol) {
-          throw new FriendlyError(`Token ${token.id} has no symbol`);
-        }
-        if (!token.decimals) {
-          throw new FriendlyError(`Token ${token.id} has no decimals`);
-        }
-        if (!token.name) {
-          throw new FriendlyError(`Token ${token.id} has no name`);
-        }
+  if (tokenMetadata.length === 0) return [];
 
-        return {
-          id: token.id,
-          name: token.name,
-          symbol: token.symbol,
-          decimals: Number.parseInt(token.decimals, 10),
-          balances: token.balances.map(balance => ({
-            balance: balance.amount,
-            holder: balance.account.id,
-          })),
-        };
-      })
-    )
+  return R.pipe(
+    tokenMetadata,
+    R.map(meta => {
+      if (!meta.symbol) throw new FriendlyError(`Token ${meta.id} has no symbol`);
+      if (!meta.name) throw new FriendlyError(`Token ${meta.id} has no name`);
+      const byAccount = balanceMap.get(meta.id.toLowerCase()) ?? new Map();
+      const balances = Array.from(byAccount.entries(), ([holder, decimal]) => ({
+        balance: decimal.toString(),
+        holder,
+      }));
+      return {
+        id: meta.address.toLowerCase(),
+        name: meta.name,
+        symbol: meta.symbol,
+        decimals: meta.decimals,
+        balances,
+      };
+    })
   );
 };
 
@@ -191,48 +170,45 @@ const getTopContractHolders = async (
   contract_addresses: Hex[],
   limit: number
 ) => {
-  const res = (
-    await Promise.all(
-      getSdksForChain(chainId).map(sdk =>
-        paginate({
-          fetchPage: ({ skip: tokenSkip, first: tokenFirst }) =>
-            sdk.ContractBalance({
-              tokenSkip,
-              tokenFirst,
-              skip: 0,
-              first: limit,
-              account_not_in: ['0x0000000000000000000000000000000000000000'], // providing an empty account_not_in will return 0 holders
-              token_in_1: contract_addresses,
-              token_in_2: contract_addresses,
-              orderBy: TokenBalance_OrderBy.Amount,
-              orderDirection: OrderDirection.Desc,
-            }),
-          count: res => res.data.tokens.length,
-        })
-      )
-    )
-  ).flat();
+  const tokenIn = contract_addresses.map(a => getTokenId({ chainId, address: a }));
+  const accountNotIn = [
+    getAccountId({ chainId, address: '0x0000000000000000000000000000000000000000' as Hex }),
+  ];
+  const sdk = getGlobalSdk();
+  const merged = await paginate({
+    fetchPage: ({ offset, limit: pageSize }) =>
+      sdk.ContractBalance({
+        token_in: tokenIn,
+        account_not_in: accountNotIn,
+        tokenOffset: offset,
+        tokenLimit: pageSize,
+        offset: 0,
+        limit,
+        orderBy: { amount: Order_By.Desc },
+      }),
+    count: res => res.data.Token.length,
+    merge: (a, b) => ({
+      ...a,
+      data: {
+        ...a.data,
+        Token: [...(a.data?.Token ?? []), ...(b.data?.Token ?? [])],
+      },
+    }),
+  });
 
-  return res.flatMap(chainRes =>
-    chainRes.data.tokens.map(token => {
-      if (!token.symbol) {
-        throw new FriendlyError(`Token ${token.id} has no symbol`);
-      }
-      if (!token.decimals) {
-        throw new FriendlyError(`Token ${token.id} has no decimals`);
-      }
-      if (!token.name) {
-        throw new FriendlyError(`Token ${token.id} has no name`);
-      }
-
+  return R.pipe(
+    merged.data?.Token ?? [],
+    R.map(token => {
+      if (!token.symbol) throw new FriendlyError(`Token ${token.id} has no symbol`);
+      if (!token.name) throw new FriendlyError(`Token ${token.id} has no name`);
       return {
-        id: token.id,
+        id: token.address.toLowerCase(),
         name: token.name,
         symbol: token.symbol,
-        decimals: Number.parseInt(token.decimals, 10),
+        decimals: token.decimals,
         balances: token.balances.map(balance => ({
-          rawAmount: balance.rawAmount,
-          holder: balance.account.id,
+          balance: balance.amount,
+          holder: balance.account_id,
         })),
       };
     })

@@ -16,13 +16,18 @@ export const getUserTVLAtBlock = async (
 ) => {
   logger.debug({ msg: 'Fetching user TVL', blockNumber, chainId });
 
-  const [allVaultConfigs, investorPositions] = await Promise.all([
-    getBeefyBreakdownableVaultConfig(chainId, vaultFilter),
-    getTokenBalances(chainId, {
-      blockNumber: BigInt(blockNumber),
-      minBalance: BigInt(1),
-    }),
-  ]);
+  const allVaultConfigs = await getBeefyBreakdownableVaultConfig(chainId, vaultFilter);
+  const tokenAddresses = uniq(
+    allVaultConfigs.flatMap(v => [
+      v.vault_address as Hex,
+      ...v.reward_pools.map(p => p.reward_pool_address as Hex),
+    ])
+  );
+  const investorPositions = await getTokenBalances(chainId, {
+    blockNumber: BigInt(blockNumber),
+    tokenAddresses,
+    minBalance: BigInt(1),
+  });
   logger.debug({
     msg: 'Fetched vaults and positions',
     vaultConfigs: allVaultConfigs.length,

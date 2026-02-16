@@ -1,6 +1,7 @@
 query AllTokenHolders($limit: Int = 1000, $offset: Int = 0) {
   Token(limit: $limit, offset: $offset, order_by: { id: asc }) {
     id
+    chainId
     holderCount
   }
 }

@@ -13,6 +13,7 @@ query ContractBalance(
     where: { id: { _in: $token_in } }
   ) {
     id
+    address
     name
     decimals
     symbol

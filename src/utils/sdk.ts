@@ -19,7 +19,7 @@ export async function paginate<R>({
   fetchAtMost = 1_000_000_000,
   delay = 0,
 }: {
-  fetchPage: (params: { skip: number; first: number }) => Promise<R>;
+  fetchPage: (params: { offset: number; limit: number }) => Promise<R>;
   count: (res: NoInfer<R>) => number | number[];
   merge: (a: NoInfer<R>, b: NoInfer<R>) => NoInfer<R>;
   pageSize?: number;
@@ -27,11 +27,11 @@ export async function paginate<R>({
   delay?: number;
 }): Promise<NoInfer<R>> {
   const results: R[] = [];
-  let skip = 0;
+  let offset = 0;
   let fetched = 0;
 
   while (fetched < fetchAtMost) {
-    const res = await fetchPage({ skip, first: pageSize });
+    const res = await fetchPage({ offset, limit: pageSize });
     results.push(res);
     const resCountOrCounts = count(res);
     const resCount = Array.isArray(resCountOrCounts)
@@ -42,7 +42,7 @@ export async function paginate<R>({
       break;
     }
     fetched += resCount;
-    skip += pageSize;
+    offset += pageSize;
 
     // Add delay between fetches if specified
     if (delay > 0) {

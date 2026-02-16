@@ -1,5 +1,7 @@
 import { type Static, Type } from '@sinclair/typebox';
-import { groupBy, keyBy, min, uniq } from 'lodash';
+import type Decimal from 'decimal.js';
+import { uniq } from 'lodash';
+import * as R from 'remeda';
 import type { Hex } from 'viem';
 import type { ChainId } from '../config/chains';
 import { addressSchema } from '../schema/address';
@@ -8,7 +10,7 @@ import {
   getBeefyBreakdownableVaultConfig,
 } from '../vault-breakdown/vault/getBeefyVaultConfig';
 import { FriendlyError } from './error';
-import { getSdksForChain, paginate } from './sdk';
+import { getTokenBalancesAtBlock } from './token-balance-at-block';
 
 // Define schemas
 export const tokenBalancesSchema = Type.Object({
@@ -21,6 +23,12 @@ export const tokenBalancesSchema = Type.Object({
 
 export const vaultHoldersSchema = Type.Array(tokenBalancesSchema);
 export type VaultHolders = Static<typeof vaultHoldersSchema>;
+
+type HolderWithDetails = {
+  holder: string;
+  balance: string | bigint;
+  hold_details: Array<{ token: Hex; balance: string }>;
+};
 
 export const getVaultHoldersAsBaseVaultEquivalentForVaultAddress = async (
   chainId: ChainId,
@@ -82,93 +90,111 @@ export const getVaultHoldersAsBaseVaultEquivalentForVaultId = async (
   return _getVaultHoldersAsBaseVaultEquivalent(chainId, configs[0], block, balanceGt);
 };
 
+type BalanceEntry = { balance: string; holder: string };
+type BalancesByContract = Record<
+  string,
+  { id: string; name: string; symbol: string; decimals: number; balances: BalanceEntry[] }
+>;
+
+/** Maps balance entries to HolderWithDetails for a given token address. */
+const withHoldDetails = (balances: BalanceEntry[], tokenAddress: Hex): HolderWithDetails[] =>
+  R.pipe(
+    balances,
+    R.map(e => ({
+      ...e,
+      hold_details: [{ token: tokenAddress, balance: e.balance }],
+    }))
+  );
+
+/** Gets balances for a contract from balancesByContract and wraps with hold_details. */
+const getHoldersWithDetails = (
+  balancesByContract: BalancesByContract,
+  tokenAddress: Hex
+): HolderWithDetails[] =>
+  withHoldDetails(balancesByContract[tokenAddress.toLowerCase()]?.balances ?? [], tokenAddress);
+
+/** Aggregates holders: group by holder (lowercase), sum balance, concat hold_details. */
+const aggregateByHolder = (holders: HolderWithDetails[]) =>
+  R.pipe(
+    holders,
+    R.groupBy((e: HolderWithDetails) => e.holder.toLowerCase()),
+    R.entries(),
+    R.map(([holder, balances]) => ({
+      holder,
+      balance: R.reduce(
+        balances,
+        (acc: bigint, curr: HolderWithDetails) => acc + BigInt(curr.balance),
+        0n
+      ),
+      hold_details: R.flatMap(balances, (e: HolderWithDetails) => e.hold_details),
+    }))
+  );
+
 const _getVaultHoldersAsBaseVaultEquivalent = async (
   chainId: ChainId,
   config: BeefyVault,
   block: bigint,
   balanceGt = 0n
 ) => {
-  const tokens = uniq(
-    (config.protocol_type === 'beefy_clm_vault'
+  const tokens = R.pipe(
+    config.protocol_type === 'beefy_clm_vault'
       ? [
           config.vault_address,
           config.beefy_clm_manager.vault_address,
-          ...config.beefy_clm_manager.reward_pools.map(pool => pool.reward_pool_address),
-          ...config.beefy_clm_manager.boosts.map(boost => boost.boost_address),
-          ...config.reward_pools.map(pool => pool.reward_pool_address),
-          ...config.boosts.map(boost => boost.boost_address),
+          ...R.flatMap(config.beefy_clm_manager.reward_pools, pool => pool.reward_pool_address),
+          ...R.flatMap(config.beefy_clm_manager.boosts, boost => boost.boost_address),
+          ...R.flatMap(config.reward_pools, pool => pool.reward_pool_address),
+          ...R.flatMap(config.boosts, boost => boost.boost_address),
         ]
       : [
           config.vault_address,
-          ...config.reward_pools.map(pool => pool.reward_pool_address),
-          ...config.boosts.map(boost => boost.boost_address),
-        ]
-    ).map(address => address.toLowerCase() as Hex)
+          ...R.flatMap(config.reward_pools, pool => pool.reward_pool_address),
+          ...R.flatMap(config.boosts, boost => boost.boost_address),
+        ],
+    R.map((address: string) => address.toLowerCase() as Hex),
+    R.unique()
   );
 
-  const strategies = uniq(
-    (config.protocol_type === 'beefy_clm_vault'
+  const strategies = R.pipe(
+    config.protocol_type === 'beefy_clm_vault'
       ? [config.strategy_address, config.beefy_clm_manager.strategy_address]
-      : [config.strategy_address]
-    ).map(address => address.toLowerCase())
+      : [config.strategy_address],
+    R.map((address: string) => address.toLowerCase()),
+    R.unique()
   );
-  const excludeHolders = uniq([...strategies, ...tokens]);
+  const excludeHolders = R.unique([...strategies, ...tokens]);
 
-  const res = (
-    await Promise.all(
-      getSdksForChain(chainId).map(sdk =>
-        paginate({
-          fetchPage: ({ skip: tokenSkip, first: tokenFirst }) =>
-            paginate({
-              fetchPage: ({ skip, first }) =>
-                sdk.TokenBalance({
-                  tokenSkip,
-                  tokenFirst,
-                  skip,
-                  first,
-                  block: Number(block),
-                  account_not_in: ['0x0000000000000000000000000000000000000000'],
-                  amount_gt: balanceGt.toString(),
-                  token_in_1: tokens,
-                  token_in_2: tokens,
-                }),
-              count: res => min(res.data.tokens.map(token => token.balances.length)) ?? 0,
-            }),
-          count: res => min(res.map(chainRes => chainRes.data.tokens.length)) ?? 0,
-        })
-      )
-    )
-  ).flat();
+  const { balanceMap, tokenMetadata } = await getTokenBalancesAtBlock({
+    chainId,
+    targetBlock: block,
+    tokenAddresses: tokens as Hex[],
+    excludeAccounts: excludeHolders as Hex[],
+  });
 
-  const balancesByContract = keyBy(
-    res.flatMap(chainRes =>
-      chainRes.flatMap(tokenPage =>
-        tokenPage.data.tokens.map(token => {
-          if (!token.symbol) {
-            throw new FriendlyError(`Token ${token.id} has no symbol`);
-          }
-          if (!token.decimals) {
-            throw new FriendlyError(`Token ${token.id} has no decimals`);
-          }
-          if (!token.name) {
-            throw new FriendlyError(`Token ${token.id} has no name`);
-          }
+  const balancesByContract = R.pipe(
+    tokenMetadata,
+    R.map(meta => {
+      if (!meta.symbol) throw new FriendlyError(`Token ${meta.id} has no symbol`);
+      if (!meta.name) throw new FriendlyError(`Token ${meta.id} has no name`);
+      const byAccount = balanceMap.get(meta.id.toLowerCase()) ?? new Map<string, Decimal>();
+      const balances = R.pipe(
+        Array.from(byAccount.entries()),
+        R.map(([holder, decimal]) => ({ balance: decimal.toString(), holder })),
+        R.filter(({ balance }) => BigInt(balance) > balanceGt)
+      );
+      return {
+        id: meta.address.toLowerCase(),
+        name: meta.name,
+        symbol: meta.symbol,
+        decimals: meta.decimals,
+        balances,
+      };
+    }),
+    R.indexBy(e => e.id)
+  ) as BalancesByContract;
 
-          return {
-            id: token.id.toLowerCase(),
-            name: token.name,
-            symbol: token.symbol,
-            decimals: Number.parseInt(token.decimals, 10),
-            balances: token.balances.map(balance => ({
-              balance: balance.amount,
-              holder: balance.account.id,
-            })),
-          };
-        })
-      )
-    ),
-    e => e.id
-  );
+  const isExcluded = (holder: string) => excludeHolders.includes(holder.toLowerCase());
+  const hasNonZeroBalance = (e: HolderWithDetails) => e.balance !== '0' && e.balance !== 0n;
 
   // for any token that is not the base token, we need to convert the balance to the base token
   if (config.protocol_type === 'beefy_clm_vault') {
@@ -176,155 +202,69 @@ const _getVaultHoldersAsBaseVaultEquivalent = async (
     // express everything in terms of the manager's share token
     const clmManager = config.beefy_clm_manager;
 
-    const managerShareHolders = uniq([
-      ...(balancesByContract[clmManager.vault_address.toLowerCase()]?.balances ?? []).map(e => ({
-        ...e,
-        hold_details: [
-          {
-            token: clmManager.vault_address,
-            balance: e.balance,
-          },
-        ],
-      })),
-      ...clmManager.reward_pools.flatMap(pool =>
-        (balancesByContract[pool.reward_pool_address.toLowerCase()]?.balances ?? []).map(e => ({
-          ...e,
-          hold_details: [
-            {
-              token: pool.reward_pool_address,
-              balance: e.balance,
-            },
-          ],
-        }))
+    const managerShareHolders = R.unique([
+      ...getHoldersWithDetails(balancesByContract, clmManager.vault_address),
+      ...R.flatMap(clmManager.reward_pools, pool =>
+        getHoldersWithDetails(balancesByContract, pool.reward_pool_address)
       ),
-      ...clmManager.boosts.flatMap(boost =>
-        (balancesByContract[boost.boost_address.toLowerCase()]?.balances ?? []).map(e => ({
-          ...e,
-          hold_details: [
-            {
-              token: boost.boost_address,
-              balance: e.balance,
-            },
-          ],
-        }))
+      ...R.flatMap(clmManager.boosts, boost =>
+        getHoldersWithDetails(balancesByContract, boost.boost_address)
       ),
     ]);
 
-    // now we need to find out the actual vault balance in terms of the manager's share token
     const vaultManagerShareBalance = BigInt(
-      managerShareHolders.find(
-        balance => balance.holder.toLocaleLowerCase() === config.strategy_address.toLowerCase()
-      )?.balance ?? '0'
+      R.pipe(
+        managerShareHolders,
+        R.find(b => b.holder.toLocaleLowerCase() === config.strategy_address.toLowerCase()),
+        b => b?.balance ?? '0'
+      )
     );
 
-    // we split that balance among all the holders of vault and vault reward pools
     const vaultBalances = balancesByContract[config.vault_address.toLowerCase()]?.balances ?? [];
-    const vaultTotalSupply = vaultBalances.reduce((acc, curr) => acc + BigInt(curr.balance), 0n);
-    const vaultShareHolders = uniq([
-      // vault holders
-      ...vaultBalances.map(e => ({
-        ...e,
-        hold_details: [
-          {
-            token: config.vault_address,
-            balance: e.balance,
-          },
-        ],
-      })),
-      // vault reward pool holders
-      ...config.reward_pools.flatMap(pool =>
-        (balancesByContract[pool.reward_pool_address.toLowerCase()]?.balances ?? []).map(e => ({
-          ...e,
-          hold_details: [
-            {
-              token: pool.reward_pool_address,
-              balance: e.balance,
-            },
-          ],
-        }))
-      ),
-      // vault boost holders
-      ...config.boosts.flatMap(boost =>
-        (balancesByContract[boost.boost_address.toLowerCase()]?.balances ?? []).map(e => ({
-          ...e,
-          hold_details: [
-            {
-              token: boost.boost_address,
-              balance: e.balance,
-            },
-          ],
-        }))
-      ),
-    ]).filter(e => !excludeHolders.includes(e.holder.toLowerCase()));
-
-    const vaultManagerHolders = vaultShareHolders.map(e => {
-      return {
-        ...e,
-        balance: (BigInt(e.balance) * vaultManagerShareBalance) / vaultTotalSupply,
-      };
-    });
-
-    const allHoldersBalances = [...managerShareHolders, ...vaultManagerHolders].filter(
-      e => e.balance !== '0' && !excludeHolders.includes(e.holder.toLowerCase())
+    const vaultTotalSupply = R.reduce(vaultBalances, (acc, curr) => acc + BigInt(curr.balance), 0n);
+    const vaultShareHolders = R.pipe(
+      [
+        ...getHoldersWithDetails(balancesByContract, config.vault_address),
+        ...R.flatMap(config.reward_pools, pool =>
+          getHoldersWithDetails(balancesByContract, pool.reward_pool_address)
+        ),
+        ...R.flatMap(config.boosts, boost =>
+          getHoldersWithDetails(balancesByContract, boost.boost_address)
+        ),
+      ],
+      R.unique(),
+      R.filter(e => !isExcluded(e.holder))
     );
 
-    // now merge the multiple holds into a single hold per holder
-    const balancesPerHolder = groupBy(allHoldersBalances, e => e.holder.toLowerCase());
-    const mergedHolders = Object.entries(balancesPerHolder).map(([holder, balances]) => ({
-      holder,
-      balance: balances.reduce((acc, curr) => acc + BigInt(curr.balance), 0n),
-      hold_details: balances.flatMap(e => e.hold_details),
+    const vaultManagerHolders = R.map(vaultShareHolders, e => ({
+      ...e,
+      balance: (BigInt(e.balance) * vaultManagerShareBalance) / vaultTotalSupply,
     }));
-    return mergedHolders;
+
+    const allHoldersBalances = R.pipe(
+      [...managerShareHolders, ...vaultManagerHolders],
+      R.filter(e => hasNonZeroBalance(e) && !isExcluded(e.holder))
+    ) as HolderWithDetails[];
+
+    return aggregateByHolder(allHoldersBalances);
   }
 
-  // now we need to find out the actual vault balance in terms of the manager's share token
-  const managerShareHolders = uniq([
-    ...(balancesByContract[config.vault_address.toLowerCase()]?.balances ?? []).map(e => ({
-      ...e,
-      hold_details: [
-        {
-          token: config.vault_address,
-          balance: e.balance,
-        },
-      ],
-    })),
-    ...config.reward_pools.flatMap(pool =>
-      (balancesByContract[pool.reward_pool_address.toLowerCase()]?.balances ?? []).map(e => ({
-        ...e,
-        hold_details: [
-          {
-            token: pool.reward_pool_address,
-            balance: e.balance,
-          },
-        ],
-      }))
+  const managerShareHolders = R.unique([
+    ...getHoldersWithDetails(balancesByContract, config.vault_address),
+    ...R.flatMap(config.reward_pools, pool =>
+      getHoldersWithDetails(balancesByContract, pool.reward_pool_address)
     ),
-    ...config.boosts.flatMap(boost =>
-      (balancesByContract[boost.boost_address.toLowerCase()]?.balances ?? []).map(e => ({
-        ...e,
-        hold_details: [
-          {
-            token: boost.boost_address,
-            balance: e.balance,
-          },
-        ],
-      }))
+    ...R.flatMap(config.boosts, boost =>
+      getHoldersWithDetails(balancesByContract, boost.boost_address)
     ),
   ]);
 
-  const allHoldersBalances = managerShareHolders.filter(
-    e => e.balance !== '0' && !excludeHolders.includes(e.holder.toLowerCase())
-  );
+  const allHoldersBalances = R.pipe(
+    managerShareHolders,
+    R.filter(e => e.balance !== '0' && !isExcluded(e.holder))
+  ) as HolderWithDetails[];
 
-  // now merge the multiple holds into a single hold per holder
-  const balancesPerHolder = groupBy(allHoldersBalances, e => e.holder.toLowerCase());
-  const mergedHolders = Object.entries(balancesPerHolder).map(([holder, balances]) => ({
-    holder,
-    balance: balances.reduce((acc, curr) => acc + BigInt(curr.balance), 0n),
-    hold_details: balances.flatMap(e => e.hold_details),
-  }));
-  return mergedHolders;
+  return aggregateByHolder(allHoldersBalances);
 };
 
 export const getVaultHolders = async (
@@ -371,56 +311,30 @@ export const getVaultHolders = async (
 
   const excludeHolders = uniq([...strategies, ...tokens]);
 
-  const res = (
-    await Promise.all(
-      getSdksForChain(chainId).map(sdk =>
-        paginate({
-          fetchPage: ({ skip: tokenSkip, first: tokenFirst }) =>
-            paginate({
-              fetchPage: ({ skip, first }) =>
-                sdk.TokenBalance({
-                  tokenSkip,
-                  tokenFirst,
-                  skip,
-                  first,
-                  block: Number(block),
-                  account_not_in: excludeHolders,
-                  amount_gt: balanceGt.toString(),
-                  token_in_1: tokens,
-                  token_in_2: tokens,
-                }),
-              count: res => min(res.data.tokens.map(token => token.balances.length)) ?? 0,
-            }),
-          count: res => min(res.map(chainRes => chainRes.data.tokens.length)) ?? 0,
-        })
-      )
-    )
-  ).flat();
+  const { balanceMap, tokenMetadata } = await getTokenBalancesAtBlock({
+    chainId,
+    targetBlock: block,
+    tokenAddresses: tokens as Hex[],
+    excludeAccounts: excludeHolders as Hex[],
+  });
 
-  return res.flatMap(chainRes =>
-    chainRes.flatMap(tokenPage =>
-      tokenPage.data.tokens.map(token => {
-        if (!token.symbol) {
-          throw new FriendlyError(`Token ${token.id} has no symbol`);
-        }
-        if (!token.decimals) {
-          throw new FriendlyError(`Token ${token.id} has no decimals`);
-        }
-        if (!token.name) {
-          throw new FriendlyError(`Token ${token.id} has no name`);
-        }
-
-        return {
-          id: token.id,
-          name: token.name,
-          symbol: token.symbol,
-          decimals: Number.parseInt(token.decimals, 10),
-          balances: token.balances.map(balance => ({
-            balance: balance.amount,
-            holder: balance.account.id,
-          })),
-        };
-      })
-    )
+  return R.pipe(
+    tokenMetadata,
+    R.map(meta => {
+      if (!meta.symbol) throw new FriendlyError(`Token ${meta.id} has no symbol`);
+      if (!meta.name) throw new FriendlyError(`Token ${meta.id} has no name`);
+      const byAccount = balanceMap.get(meta.id.toLowerCase()) ?? new Map<string, Decimal>();
+      const balances = Array.from(byAccount.entries(), ([holder, decimal]) => ({
+        balance: decimal.toString(),
+        holder,
+      })).filter(({ balance }) => BigInt(balance) > balanceGt);
+      return {
+        id: meta.address.toLowerCase(),
+        name: meta.name,
+        symbol: meta.symbol,
+        decimals: meta.decimals,
+        balances,
+      };
+    })
   );
 };

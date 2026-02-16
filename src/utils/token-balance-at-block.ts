@@ -3,33 +3,77 @@ import type { Hex } from 'viem';
 import type { ChainId } from '../config/chains';
 import { FriendlyError } from './error';
 import { getGlobalSdk, paginate } from './sdk';
+import { getAccountId, getTokenId } from './subgraph-ids';
 import { getViemClient } from './viemClient';
+
+export type TokenMetadata = {
+  id: string;
+  address: string;
+  name: string | null;
+  symbol: string | null;
+  decimals: number;
+};
+
+export type TokenBalancesAtBlockResult = {
+  balanceMap: Map<string, Map<string, Decimal>>;
+  tokenMetadata: TokenMetadata[];
+};
 
 /**
  * Fetches token balances at an exact block by combining the last daily snapshot
  * with balance changes between the snapshot and target block (streaming replay).
- * Returns a nested map: tokenId -> accountId -> balance (Decimal).
+ * Also fetches token metadata (id, address, name, symbol, decimals).
  */
 export async function getTokenBalancesAtBlock(options: {
   chainId: ChainId;
   targetBlock: bigint;
   tokenAddresses: Hex[];
   excludeAccounts?: Hex[];
-}): Promise<Map<string, Map<string, Decimal>>> {
+}): Promise<TokenBalancesAtBlockResult> {
   const { chainId, targetBlock, tokenAddresses, excludeAccounts = [] } = options;
 
   const sdk = getGlobalSdk();
   const numericChainId = getViemClient(chainId).chain.id;
   const targetBlockStr = targetBlock.toString();
-  const tokenIn = tokenAddresses.map(a => a.toLowerCase());
-  const accountNotIn = excludeAccounts.length
-    ? excludeAccounts.map(a => a.toLowerCase())
-    : ['0x0000000000000000000000000000000000000000'];
+  const tokenIn = tokenAddresses.map(a => getTokenId({ chainId, address: a }));
+  if (tokenIn.length === 0) {
+    throw new FriendlyError(`No token addresses provided for chain ${chainId}`);
+  }
+  const accountNotIn =
+    excludeAccounts.length > 0
+      ? excludeAccounts.map(a => getAccountId({ chainId, address: a }))
+      : [getAccountId({ chainId, address: '0x0000000000000000000000000000000000000000' as Hex })];
 
-  const lastSnapshotRes = await sdk.TokenBalanceSnapshotLastDailySnapshotAtBlock({
-    chainId: numericChainId,
-    block: targetBlockStr,
-  });
+  const [lastSnapshotRes, metadataMerged] = await Promise.all([
+    sdk.TokenBalanceSnapshotLastDailySnapshotAtBlock({
+      chainId: numericChainId,
+      block: targetBlockStr,
+    }),
+    paginate({
+      fetchPage: ({ offset, limit }) =>
+        sdk.TokenMetadata({
+          token_in: tokenIn,
+          tokenOffset: offset,
+          tokenLimit: limit,
+        }),
+      count: res => res.data.Token.length,
+      merge: (a, b) => ({
+        ...a,
+        data: {
+          ...a.data,
+          Token: [...(a.data?.Token ?? []), ...(b.data?.Token ?? [])],
+        },
+      }),
+    }),
+  ]);
+
+  const tokenMetadata: TokenMetadata[] = (metadataMerged.data?.Token ?? []).map(t => ({
+    id: t.id,
+    address: t.address?.toLowerCase() ?? t.id,
+    name: t.name ?? null,
+    symbol: t.symbol ?? null,
+    decimals: t.decimals,
+  }));
 
   if (lastSnapshotRes.errors?.length) {
     throw new FriendlyError(
@@ -50,14 +94,14 @@ export async function getTokenBalancesAtBlock(options: {
   const balances = new Map<string, Map<string, Decimal>>();
 
   const balanceSnapshots = await paginate({
-    fetchPage: ({ skip, first }) =>
+    fetchPage: ({ offset, limit }) =>
       sdk.TokenBalanceSnapshotAtBlock({
         chainId: numericChainId,
         token_in: tokenIn,
         account_not_in: accountNotIn,
         snapshotBlock: lastSnapshotBlock.toString(),
-        offset: skip,
-        limit: first,
+        offset,
+        limit,
       }),
     count: res => res.data?.TokenBalanceSnapshot?.length ?? 0,
     merge: (a, b) => ({
@@ -84,15 +128,15 @@ export async function getTokenBalancesAtBlock(options: {
   }
 
   const changesMerged = await paginate({
-    fetchPage: ({ skip, first }) =>
+    fetchPage: ({ offset, limit }) =>
       sdk.TokenBalanceChangesBetweenBlocks({
         chainId: numericChainId,
         token_in: tokenIn,
         account_not_in: accountNotIn,
         block_gt: lastSnapshotBlock.toString(),
         block_lte: targetBlockStr,
-        offset: skip,
-        limit: first,
+        offset,
+        limit,
       }),
     count: res => res.data?.TokenBalanceChange?.length ?? 0,
     merge: (a, b) => ({
@@ -121,5 +165,5 @@ export async function getTokenBalancesAtBlock(options: {
     byAccount.set(aid, current.plus(diff));
   }
 
-  return balances;
+  return { balanceMap: balances, tokenMetadata };
 }
