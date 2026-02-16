@@ -10,7 +10,7 @@ query AccountLatestBalance(
       order_by: { id: asc }
       where: { amount: { _gt: 0 } }
     ) {
-      chainId
+      networkId: chainId
       token {
         id
         symbol
@@ -21,7 +21,7 @@ query AccountLatestBalance(
     }
   }
   _meta(limit: 1, order_by: { readyAt: desc }) {
-    chainId
+    networkId: chainId
     progressBlock
     readyAt
   }

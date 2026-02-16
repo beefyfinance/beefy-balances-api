@@ -1,7 +1,13 @@
 query AllTokenHolders($limit: Int = 1000, $offset: Int = 0) {
-  Token(limit: $limit, offset: $offset, order_by: { id: asc }) {
+  Token(
+    limit: $limit
+    offset: $offset
+    order_by: { id: asc }
+    where: { holderCount: { _gt: 0 } }
+  ) {
     id
-    chainId
+    address
+    networkId: chainId
     holderCount
   }
 }

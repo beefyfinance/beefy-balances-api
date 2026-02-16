@@ -1,5 +1,5 @@
 query TokenBalanceSnapshotAtBlock(
-  $chainId: Int!
+  $networkId: Int!
   $token_in: [String!]!
   $account_not_in: [String!]!
   $snapshotBlock: numeric!
@@ -10,7 +10,7 @@ query TokenBalanceSnapshotAtBlock(
     limit: $limit
     offset: $offset
     where: {
-      chainId: { _eq: $chainId }
+      chainId: { _eq: $networkId }
       blockNumber: { _eq: $snapshotBlock }
       account_id: { _nin: $account_not_in }
       token_id: { _in: $token_in }

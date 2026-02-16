@@ -49,15 +49,16 @@ async function getStatus(): Promise<Status> {
   const metaList = res.data?._meta ?? [];
 
   return metaList.reduce(
-    (acc: Status, meta: { chainId?: number | null; progressBlock?: number | null }) => {
-      const chainId = meta.chainId;
-      if (chainId == null) return acc;
-      const chain = getChainIdFromNetworkId(chainId);
+    (acc: Status, meta: { networkId?: number | null; progressBlock?: number | null }) => {
+      const networkId = meta.networkId;
+      if (networkId == null) return acc;
+      const chain = getChainIdFromNetworkId(networkId);
+      if (chain == null) return acc;
       acc[chain] = [
-        ...(acc[chain] || []),
+        ...(acc[chain] ?? []),
         {
-          subgraph: '',
-          tag: 'default',
+          subgraph: 'envio',
+          tag: 'latest',
           blockNumber: meta.progressBlock ?? null,
           timestamp: null,
           hasErrors: false,

@@ -4,7 +4,7 @@ import type { ChainId } from '../config/chains';
 import { FriendlyError } from './error';
 import { getGlobalSdk, paginate } from './sdk';
 import { getAccountId, getTokenId } from './subgraph-ids';
-import { getViemClient } from './viemClient';
+import { getNetworkIdFromChainId } from './viemClient';
 
 export type TokenMetadata = {
   id: string;
@@ -33,7 +33,7 @@ export async function getTokenBalancesAtBlock(options: {
   const { chainId, targetBlock, tokenAddresses, excludeAccounts = [] } = options;
 
   const sdk = getGlobalSdk();
-  const numericChainId = getViemClient(chainId).chain.id;
+  const networkId = getNetworkIdFromChainId(chainId);
   const targetBlockStr = targetBlock.toString();
   const tokenIn = tokenAddresses.map(a => getTokenId({ chainId, address: a }));
   if (tokenIn.length === 0) {
@@ -46,7 +46,7 @@ export async function getTokenBalancesAtBlock(options: {
 
   const [lastSnapshotRes, metadataMerged] = await Promise.all([
     sdk.TokenBalanceSnapshotLastDailySnapshotAtBlock({
-      chainId: numericChainId,
+      networkId: networkId,
       block: targetBlockStr,
     }),
     paginate({
@@ -66,6 +66,14 @@ export async function getTokenBalancesAtBlock(options: {
       }),
     }),
   ]);
+
+  const meta = lastSnapshotRes.data?._meta?.at(0);
+  const lastProcessedBlock = meta?.progressBlock != null ? BigInt(meta.progressBlock) : null;
+  if (lastProcessedBlock === null || lastProcessedBlock < targetBlock) {
+    throw new FriendlyError(
+      `Indexer has not processed up to block ${targetBlockStr} for chain ${chainId} (last processed block: ${lastProcessedBlock?.toString() ?? 'unknown'})`
+    );
+  }
 
   const tokenMetadata: TokenMetadata[] = (metadataMerged.data?.Token ?? []).map(t => ({
     id: t.id,
@@ -96,7 +104,7 @@ export async function getTokenBalancesAtBlock(options: {
   const balanceSnapshots = await paginate({
     fetchPage: ({ offset, limit }) =>
       sdk.TokenBalanceSnapshotAtBlock({
-        chainId: numericChainId,
+        networkId: networkId,
         token_in: tokenIn,
         account_not_in: accountNotIn,
         snapshotBlock: lastSnapshotBlock.toString(),
@@ -130,7 +138,7 @@ export async function getTokenBalancesAtBlock(options: {
   const changesMerged = await paginate({
     fetchPage: ({ offset, limit }) =>
       sdk.TokenBalanceChangesBetweenBlocks({
-        chainId: numericChainId,
+        networkId: networkId,
         token_in: tokenIn,
         account_not_in: accountNotIn,
         block_gt: lastSnapshotBlock.toString(),

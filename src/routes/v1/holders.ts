@@ -62,11 +62,12 @@ const getHolderCount = async (): Promise<Array<HolderCount>> => {
 
   return R.pipe(
     merged.data?.Token ?? [],
-    R.map((token: { id: string; chainId: number; holderCount: number }) => ({
-      chain: getChainIdFromNetworkId(token.chainId),
-      token_address: token.id,
+    R.map(token => ({
+      chain: getChainIdFromNetworkId(token.networkId),
+      token_address: token.address,
       holder_count: Number(token.holderCount),
-    }))
+    })),
+    R.filter((row): row is HolderCount => row.chain != null)
   );
 };
 
@@ -102,6 +103,8 @@ const getLatestBalances = async (address: string): Promise<ChainData[]> => {
     }),
   });
 
+  console.log(JSON.stringify(merged.data, null, 2));
+
   if (!merged.data?.Account_by_pk) return [];
 
   const account = merged.data.Account_by_pk;
@@ -120,7 +123,7 @@ const getLatestBalances = async (address: string): Promise<ChainData[]> => {
       const decimals = Number(balance.token.decimals);
       const amount = interpretAsDecimal(balance.amount, decimals).toString();
       return {
-        chainId: balance.chainId,
+        networkId: balance.networkId,
         token: {
           address: balance.token.id,
           symbol: balance.token.symbol ?? '',
@@ -132,12 +135,12 @@ const getLatestBalances = async (address: string): Promise<ChainData[]> => {
       };
     });
 
-  const byChain = R.groupBy(balancesWithChain, b => String(b.chainId));
+  const byChain = R.groupBy(balancesWithChain, b => String(b.networkId));
 
   return R.pipe(
     Object.entries(byChain),
-    R.map(([numericChainId, chainBalances]) => ({
-      chain: getChainIdFromNetworkId(Number(numericChainId)),
+    R.map(([networkId, chainBalances]) => ({
+      chain: getChainIdFromNetworkId(Number(networkId)),
       block,
       balances: chainBalances.map(({ token, amount, rawAmount }) => ({
         token,
@@ -145,7 +148,10 @@ const getLatestBalances = async (address: string): Promise<ChainData[]> => {
         rawAmount,
       })),
     })),
-    R.filter(chainData => chainData.balances.length > 0)
+    R.filter(
+      (chainData): chainData is ChainData =>
+        chainData.chain != null && chainData.balances.length > 0
+    )
   );
 };
 

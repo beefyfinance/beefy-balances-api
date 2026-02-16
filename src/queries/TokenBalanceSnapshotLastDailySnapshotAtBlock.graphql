@@ -1,10 +1,10 @@
 query TokenBalanceSnapshotLastDailySnapshotAtBlock(
-  $chainId: Int!
+  $networkId: Int!
   $block: numeric!
 ) {
   TokenBalanceSnapshot(
     where: {
-      chainId: { _eq: $chainId }
+      chainId: { _eq: $networkId }
       period: { _eq: 86400 }
       blockNumber: { _lte: $block }
     }
@@ -13,5 +13,9 @@ query TokenBalanceSnapshotLastDailySnapshotAtBlock(
     roundedTimestamp
     timestamp
     blockNumber
+  }
+  _meta(where: { chainId: { _eq: $networkId } }, limit: 1) {
+    networkId: chainId
+    progressBlock
   }
 }

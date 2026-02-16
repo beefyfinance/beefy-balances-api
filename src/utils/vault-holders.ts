@@ -151,7 +151,7 @@ const _getVaultHoldersAsBaseVaultEquivalent = async (
           ...R.flatMap(config.reward_pools, pool => pool.reward_pool_address),
           ...R.flatMap(config.boosts, boost => boost.boost_address),
         ],
-    R.map((address: string) => address.toLowerCase() as Hex),
+    R.map(address => address.toLowerCase() as Hex),
     R.unique()
   );
 
@@ -159,7 +159,7 @@ const _getVaultHoldersAsBaseVaultEquivalent = async (
     config.protocol_type === 'beefy_clm_vault'
       ? [config.strategy_address, config.beefy_clm_manager.strategy_address]
       : [config.strategy_address],
-    R.map((address: string) => address.toLowerCase()),
+    R.map(address => address.toLowerCase()),
     R.unique()
   );
   const excludeHolders = R.unique([...strategies, ...tokens]);

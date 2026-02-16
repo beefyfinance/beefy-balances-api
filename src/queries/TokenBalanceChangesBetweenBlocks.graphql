@@ -1,5 +1,5 @@
 query TokenBalanceChangesBetweenBlocks(
-  $chainId: Int!
+  $networkId: Int!
   $token_in: [String!]!
   $account_not_in: [String!]!
   $block_gt: numeric!
@@ -11,7 +11,7 @@ query TokenBalanceChangesBetweenBlocks(
     limit: $limit
     offset: $offset
     where: {
-      chainId: { _eq: $chainId }
+      chainId: { _eq: $networkId }
       token_id: { _in: $token_in }
       account_id: { _nin: $account_not_in }
       blockNumber: { _gt: $block_gt, _lte: $block_lte }

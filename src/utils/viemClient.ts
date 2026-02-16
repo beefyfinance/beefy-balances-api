@@ -103,13 +103,14 @@ export type BeefyViemClient = ReturnType<typeof getViemClient>;
 /**
  * Map a numeric network id (e.g. 1 for Ethereum, 42161 for Arbitrum) to our ChainId enum.
  */
-export function getChainIdFromNetworkId(numeric: number): ChainId {
-  return R.pipe(
-    Object.entries(mapping),
-    R.filter(([_, chain]) => chain.id === numeric),
-    R.map(([chainId]) => chainId as ChainId),
-    R.first(),
-    R.defaultTo('ethereum' as ChainId)
+export function getChainIdFromNetworkId(numeric: number): ChainId | null {
+  return (
+    R.pipe(
+      Object.entries(mapping),
+      R.filter(([_, chain]) => chain.id === numeric),
+      R.map(([chainId]) => chainId as ChainId),
+      R.first()
+    ) ?? null
   );
 }
 
