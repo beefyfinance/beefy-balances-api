@@ -14,13 +14,14 @@ query AccountLatestBalance(
       token {
         id
         symbol
+        address
         name
         decimals
       }
       amount
     }
   }
-  _meta(limit: 1, order_by: { readyAt: desc }) {
+  _meta {
     networkId: chainId
     progressBlock
     readyAt

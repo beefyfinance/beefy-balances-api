@@ -135,7 +135,7 @@ const getContractHolders = async (
   block: bigint
 ): Promise<ContractHolders> => {
   const excludeAccounts = ['0x0000000000000000000000000000000000000000'] as Hex[];
-  const { balanceMap, tokenMetadata } = await getTokenBalancesAtBlock({
+  const { balances, tokenMetadata } = await getTokenBalancesAtBlock({
     chainId,
     targetBlock: block,
     tokenAddresses: [contract_address],
@@ -149,17 +149,21 @@ const getContractHolders = async (
     R.map(meta => {
       if (!meta.symbol) throw new FriendlyError(`Token ${meta.id} has no symbol`);
       if (!meta.name) throw new FriendlyError(`Token ${meta.id} has no name`);
-      const byAccount = balanceMap.get(meta.id.toLowerCase()) ?? new Map();
-      const balances = Array.from(byAccount.entries(), ([holder, decimal]) => ({
-        balance: decimal.toString(),
-        holder,
-      }));
+
       return {
         id: meta.address.toLowerCase(),
         name: meta.name,
         symbol: meta.symbol,
         decimals: meta.decimals,
-        balances,
+        balances: R.pipe(
+          balances,
+          R.filter(e => e.tokenAddress === meta.address.toLowerCase()),
+          R.filter(e => e.balanceRaw > 0n),
+          R.map(e => ({
+            balance: e.balanceRaw.toString(),
+            holder: e.accountAddress,
+          }))
+        ),
       };
     })
   );

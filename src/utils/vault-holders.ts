@@ -1,5 +1,4 @@
 import { type Static, Type } from '@sinclair/typebox';
-import type Decimal from 'decimal.js';
 import { uniq } from 'lodash';
 import * as R from 'remeda';
 import type { Hex } from 'viem';
@@ -164,7 +163,7 @@ const _getVaultHoldersAsBaseVaultEquivalent = async (
   );
   const excludeHolders = R.unique([...strategies, ...tokens]);
 
-  const { balanceMap, tokenMetadata } = await getTokenBalancesAtBlock({
+  const { balances, tokenMetadata } = await getTokenBalancesAtBlock({
     chainId,
     targetBlock: block,
     tokenAddresses: tokens as Hex[],
@@ -176,18 +175,20 @@ const _getVaultHoldersAsBaseVaultEquivalent = async (
     R.map(meta => {
       if (!meta.symbol) throw new FriendlyError(`Token ${meta.id} has no symbol`);
       if (!meta.name) throw new FriendlyError(`Token ${meta.id} has no name`);
-      const byAccount = balanceMap.get(meta.id.toLowerCase()) ?? new Map<string, Decimal>();
-      const balances = R.pipe(
-        Array.from(byAccount.entries()),
-        R.map(([holder, decimal]) => ({ balance: decimal.toString(), holder })),
-        R.filter(({ balance }) => BigInt(balance) > balanceGt)
-      );
       return {
         id: meta.address.toLowerCase(),
         name: meta.name,
         symbol: meta.symbol,
         decimals: meta.decimals,
-        balances,
+        balances: R.pipe(
+          balances,
+          R.filter(e => e.tokenAddress === meta.address.toLowerCase()),
+          R.filter(e => e.balanceRaw > balanceGt),
+          R.map(e => ({
+            balance: e.balanceRaw.toString(),
+            holder: e.accountAddress,
+          }))
+        ),
       };
     }),
     R.indexBy(e => e.id)
@@ -311,7 +312,7 @@ export const getVaultHolders = async (
 
   const excludeHolders = uniq([...strategies, ...tokens]);
 
-  const { balanceMap, tokenMetadata } = await getTokenBalancesAtBlock({
+  const { balances, tokenMetadata } = await getTokenBalancesAtBlock({
     chainId,
     targetBlock: block,
     tokenAddresses: tokens as Hex[],
@@ -323,17 +324,20 @@ export const getVaultHolders = async (
     R.map(meta => {
       if (!meta.symbol) throw new FriendlyError(`Token ${meta.id} has no symbol`);
       if (!meta.name) throw new FriendlyError(`Token ${meta.id} has no name`);
-      const byAccount = balanceMap.get(meta.id.toLowerCase()) ?? new Map<string, Decimal>();
-      const balances = Array.from(byAccount.entries(), ([holder, decimal]) => ({
-        balance: decimal.toString(),
-        holder,
-      })).filter(({ balance }) => BigInt(balance) > balanceGt);
       return {
         id: meta.address.toLowerCase(),
         name: meta.name,
         symbol: meta.symbol,
         decimals: meta.decimals,
-        balances,
+        balances: R.pipe(
+          balances,
+          R.filter(e => e.tokenAddress === meta.address.toLowerCase()),
+          R.filter(e => e.balanceRaw > balanceGt),
+          R.map(e => ({
+            balance: e.balanceRaw.toString(),
+            holder: e.accountAddress,
+          }))
+        ),
       };
     })
   );

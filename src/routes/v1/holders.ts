@@ -1,11 +1,13 @@
 import { type Static, Type } from '@sinclair/typebox';
+import Decimal from 'decimal.js';
 import type { FastifyInstance, FastifyPluginOptions, FastifySchema } from 'fastify';
 import * as R from 'remeda';
 import { chainIdSchema } from '../../config/chains';
 import type { AccountLatestBalanceQuery, AllTokenHoldersQuery } from '../../queries/codegen/sdk';
 import { addressSchema } from '../../schema/address';
 import { getAsyncCache } from '../../utils/async-lock';
-import { interpretAsDecimal } from '../../utils/decimal';
+import { decimalToBigInt, interpretAsDecimal } from '../../utils/decimal';
+import { FriendlyError } from '../../utils/error';
 import { getGlobalSdk, paginate } from '../../utils/sdk';
 import { getChainIdFromNetworkId } from '../../utils/viemClient';
 
@@ -78,7 +80,7 @@ const getLatestBalances = async (address: string): Promise<ChainData[]> => {
   const merged = await paginate<AccountLatestBalanceResponse>({
     fetchPage: ({ offset, limit }) =>
       sdk.AccountLatestBalance({
-        address,
+        address: address.toLowerCase(),
         offset,
         limit,
       }),
@@ -86,7 +88,7 @@ const getLatestBalances = async (address: string): Promise<ChainData[]> => {
     merge: (a, b) => ({
       ...a,
       data: {
-        ...a.data,
+        _meta: a.data._meta, // only keep the first meta
         Account_by_pk: a.data.Account_by_pk
           ? {
               ...a.data.Account_by_pk,
@@ -98,7 +100,6 @@ const getLatestBalances = async (address: string): Promise<ChainData[]> => {
           : b.data?.Account_by_pk
             ? { ...b.data.Account_by_pk, balances: b.data.Account_by_pk.balances ?? [] }
             : null,
-        _meta: a.data._meta ?? b.data?._meta,
       },
     }),
   });
@@ -106,11 +107,15 @@ const getLatestBalances = async (address: string): Promise<ChainData[]> => {
   if (!merged.data?.Account_by_pk) return [];
 
   const account = merged.data.Account_by_pk;
-  const meta = merged.data._meta?.[0];
-  const block = {
-    number: meta?.progressBlock ?? 0,
-    timestamp: 0,
-  };
+  const blockByNetworkId = R.pipe(
+    merged.data._meta ?? [],
+    R.map(meta => ({
+      networkId: meta.networkId ?? 0,
+      number: meta.progressBlock ?? 0,
+      timestamp: meta.readyAt ? new Date(meta.readyAt).getTime() : 0,
+    })),
+    R.indexBy(b => b.networkId)
+  );
 
   const balancesWithChain = (account.balances ?? [])
     .filter(
@@ -119,17 +124,17 @@ const getLatestBalances = async (address: string): Promise<ChainData[]> => {
     )
     .map(balance => {
       const decimals = Number(balance.token.decimals);
-      const amount = interpretAsDecimal(balance.amount, decimals).toString();
+      const amount = new Decimal(balance.amount);
       return {
         networkId: balance.networkId,
         token: {
-          address: balance.token.id,
+          address: balance.token.address,
           symbol: balance.token.symbol ?? '',
           name: balance.token.name ?? '',
           decimals,
         },
-        amount,
-        rawAmount: balance.amount,
+        amount: amount.toString(),
+        rawAmount: decimalToBigInt(amount, decimals).toString(),
       };
     });
 
@@ -137,19 +142,21 @@ const getLatestBalances = async (address: string): Promise<ChainData[]> => {
 
   return R.pipe(
     Object.entries(byChain),
-    R.map(([networkId, chainBalances]) => ({
-      chain: getChainIdFromNetworkId(Number(networkId)),
-      block,
-      balances: chainBalances.map(({ token, amount, rawAmount }) => ({
-        token,
-        amount,
-        rawAmount,
-      })),
-    })),
-    R.filter(
-      (chainData): chainData is ChainData =>
-        chainData.chain != null && chainData.balances.length > 0
-    )
+    R.flatMap(([networkId, chainBalances]) => {
+      const block = blockByNetworkId[Number(networkId)];
+      if (!block) throw new FriendlyError(`Block not found for network ${networkId}`);
+      const chain = getChainIdFromNetworkId(Number(networkId));
+      if (!chain) throw new FriendlyError(`Chain not found for network ${networkId}`);
+      return {
+        chain,
+        block: block,
+        balances: chainBalances.map(({ token, amount, rawAmount }) => ({
+          token,
+          amount,
+          rawAmount,
+        })),
+      };
+    })
   );
 };
 
@@ -208,7 +215,7 @@ export default async function (
           60 * 1000,
           async () => await getLatestBalances(address)
         );
-        reply.send({ chains: result });
+        reply.send(result);
       }
     );
   }

@@ -32,39 +32,25 @@ export const getTokenBalances = async (
   });
 
   const tokenAddresses = filters.tokenAddresses ?? [];
-  const { balanceMap, tokenMetadata } = await getTokenBalancesAtBlock({
+  const { balances } = await getTokenBalancesAtBlock({
     chainId,
     targetBlock,
     tokenAddresses,
   });
 
-  const tokenIdToAddress = new Map(
-    tokenMetadata.map(t => [t.id.toLowerCase(), t.address.toLowerCase() as Hex])
-  );
-
-  const allPositions: TokenBalance[] = [];
-  for (const [tokenId, byAccount] of balanceMap) {
-    const tokenAddress = tokenIdToAddress.get(tokenId);
-    if (!tokenAddress) continue;
-
-    for (const [accountId, amount] of byAccount) {
-      const balance = BigInt(amount.floor().toFixed(0));
-      if (filters.minBalance != null && balance < filters.minBalance) continue;
-      allPositions.push({
-        user_address: accountId as Hex,
-        token_address: tokenAddress,
-        balance,
-      });
-    }
-  }
-
   logger.debug({
     msg: 'Fetched user balances',
-    positions: allPositions.length,
+    positions: balances.length,
     chainId,
     filters,
     duration: Date.now() - startAt,
   });
 
-  return allPositions;
+  return balances
+    .filter(b => b.balanceRaw >= (filters.minBalance ?? 0n))
+    .map(b => ({
+      user_address: b.accountAddress,
+      token_address: b.tokenAddress,
+      balance: b.balanceRaw,
+    }));
 };
