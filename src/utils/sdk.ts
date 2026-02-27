@@ -15,7 +15,7 @@ export async function paginate<R>({
   fetchPage,
   count,
   merge,
-  pageSize = 10_000,
+  pageSize = 1_000,
   fetchAtMost = 1_000_000_000,
   delay = 0,
 }: {

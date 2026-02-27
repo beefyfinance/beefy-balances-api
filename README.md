@@ -18,6 +18,14 @@ Access api for the CLM subgraph: https://github.com/beefyfinance/beefy-balances-
     - http://localhost:4000/api/v1/holders/0x16c2b704bd087719e5a30e13d818b8f40d20c88c/latest-balances
     
     
+## Compare API output (localhost vs production)
+
+Run the local server (`npm run dev`), then in another terminal:
+
+- `npm run compare:api` — compares all endpoints with production (unordered arrays and extra fields allowed).
+- `QUICK=1 npm run compare:api` — fewer chains/addresses for a faster run.
+- `CHAINS=arbitrum,base npm run compare:api` — restrict to specific chains.
+
 ## Deploy the api
 
 - `npm run deploy` to deploy the api

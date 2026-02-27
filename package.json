@@ -24,7 +24,8 @@
     "postinstall": "npm --silent run codegen",
     "codegen": "graphql-codegen --config ./src/queries/codegen/codegen.ts",
     "update:addressbook": "ncu --upgrade @beefyfinance/blockchain-addressbook viem && npm install",
-    "lint-staged": "lint-staged"
+    "lint-staged": "lint-staged",
+    "compare:api": "ts-node --transpile-only scripts/compare-api.ts"
   },
   "dependencies": {
     "@beefyfinance/blockchain-addressbook": "^0.54.168",

@@ -1,4 +1,5 @@
 import { type Static, Type } from '@sinclair/typebox';
+import Decimal from 'decimal.js';
 import type { FastifyInstance, FastifyPluginOptions, FastifySchema } from 'fastify';
 import * as R from 'remeda';
 import type { Hex } from 'viem';
@@ -7,6 +8,7 @@ import { Order_By } from '../../queries/codegen/sdk';
 import { addressSchema } from '../../schema/address';
 import { bigintSchema } from '../../schema/bigint';
 import { getAsyncCache } from '../../utils/async-lock';
+import { decimalToBigInt } from '../../utils/decimal';
 import { FriendlyError } from '../../utils/error';
 import { getGlobalSdk, paginate } from '../../utils/sdk';
 import { getAccountId, getTokenId } from '../../utils/subgraph-ids';
@@ -210,10 +212,15 @@ const getTopContractHolders = async (
         name: token.name,
         symbol: token.symbol,
         decimals: token.decimals,
-        balances: token.balances.map(balance => ({
-          balance: balance.amount,
-          holder: balance.account_id,
-        })),
+        balances: token.balances.map(balance => {
+          const amount = new Decimal(balance.amount);
+          const rawAmount = decimalToBigInt(amount, token.decimals);
+          return {
+            balance: balance.amount,
+            rawAmount: rawAmount.toString(),
+            holder: balance.account_id,
+          };
+        }),
       };
     })
   );
