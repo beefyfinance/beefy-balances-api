@@ -1,5 +1,7 @@
 import { type Static, Type } from '@sinclair/typebox';
-import { groupBy, keyBy, min, uniq } from 'lodash';
+import { Decimal } from 'decimal.js';
+import { groupBy, uniq } from 'lodash';
+import * as R from 'remeda';
 import type { Hex } from 'viem';
 import type { ChainId } from '../config/chains';
 import { addressSchema } from '../schema/address';
@@ -7,8 +9,9 @@ import {
   type BeefyVault,
   getBeefyBreakdownableVaultConfig,
 } from '../vault-breakdown/vault/getBeefyVaultConfig';
+import { decimalToBigInt } from './decimal';
 import { FriendlyError } from './error';
-import { getSdksForChain, paginate } from './sdk';
+import { getTokenBalancesAtBlock } from './token-balance-at-block';
 
 // Define schemas
 export const tokenBalancesSchema = Type.Object({
@@ -21,6 +24,12 @@ export const tokenBalancesSchema = Type.Object({
 
 export const vaultHoldersSchema = Type.Array(tokenBalancesSchema);
 export type VaultHolders = Static<typeof vaultHoldersSchema>;
+
+type HolderWithDetails = {
+  holder: string;
+  balance: string | bigint;
+  hold_details: Array<{ token: Hex; balance: string }>;
+};
 
 export const getVaultHoldersAsBaseVaultEquivalentForVaultAddress = async (
   chainId: ChainId,
@@ -114,60 +123,33 @@ const _getVaultHoldersAsBaseVaultEquivalent = async (
   );
   const excludeHolders = uniq([...strategies, ...tokens]);
 
-  const res = (
-    await Promise.all(
-      getSdksForChain(chainId).map(sdk =>
-        paginate({
-          fetchPage: ({ skip: tokenSkip, first: tokenFirst }) =>
-            paginate({
-              fetchPage: ({ skip, first }) =>
-                sdk.TokenBalance({
-                  tokenSkip,
-                  tokenFirst,
-                  skip,
-                  first,
-                  block: Number(block),
-                  account_not_in: ['0x0000000000000000000000000000000000000000'],
-                  amount_gt: balanceGt.toString(),
-                  token_in_1: tokens,
-                  token_in_2: tokens,
-                }),
-              count: res => min(res.data.tokens.map(token => token.balances.length)) ?? 0,
-            }),
-          count: res => min(res.map(chainRes => chainRes.data.tokens.length)) ?? 0,
-        })
-      )
-    )
-  ).flat();
+  const { balances: rawBalances, tokenMetadata } = await getTokenBalancesAtBlock({
+    chainId,
+    targetBlock: block,
+    tokenAddresses: tokens as Hex[],
+    excludeAccounts: ['0x0000000000000000000000000000000000000000'],
+  });
 
-  const balancesByContract = keyBy(
-    res.flatMap(chainRes =>
-      chainRes.flatMap(tokenPage =>
-        tokenPage.data.tokens.map(token => {
-          if (!token.symbol) {
-            throw new FriendlyError(`Token ${token.id} has no symbol`);
-          }
-          if (!token.decimals) {
-            throw new FriendlyError(`Token ${token.id} has no decimals`);
-          }
-          if (!token.name) {
-            throw new FriendlyError(`Token ${token.id} has no name`);
-          }
-
-          return {
-            id: token.id.toLowerCase(),
-            name: token.name,
-            symbol: token.symbol,
-            decimals: Number.parseInt(token.decimals, 10),
-            balances: token.balances.map(balance => ({
-              balance: balance.amount,
-              holder: balance.account.id,
-            })),
-          };
-        })
-      )
-    ),
-    e => e.id
+  const balancesByContract = R.pipe(
+    tokenMetadata,
+    R.map(meta => {
+      if (!meta.symbol) throw new FriendlyError(`Token ${meta.id} has no symbol`);
+      if (!meta.name) throw new FriendlyError(`Token ${meta.id} has no name`);
+      return {
+        tokenAddress: meta.address.toLowerCase(),
+        balances: R.pipe(
+          rawBalances,
+          R.filter(e => e.tokenAddress === meta.address.toLowerCase()),
+          R.filter(e => e.balanceRaw > balanceGt),
+          R.map(e => ({
+            balance: e.balanceRaw,
+            // balanceDecimal: e.balanceDecimal,
+            holder: e.accountAddress,
+          }))
+        ),
+      };
+    }),
+    R.indexBy(e => e.tokenAddress.toLowerCase())
   );
 
   // for any token that is not the base token, we need to convert the balance to the base token
@@ -265,7 +247,7 @@ const _getVaultHoldersAsBaseVaultEquivalent = async (
     });
 
     const allHoldersBalances = [...managerShareHolders, ...vaultManagerHolders].filter(
-      e => e.balance !== '0' && !excludeHolders.includes(e.holder.toLowerCase())
+      e => e.balance !== 0n && !excludeHolders.includes(e.holder.toLowerCase())
     );
 
     // now merge the multiple holds into a single hold per holder
@@ -314,7 +296,7 @@ const _getVaultHoldersAsBaseVaultEquivalent = async (
   ]);
 
   const allHoldersBalances = managerShareHolders.filter(
-    e => e.balance !== '0' && !excludeHolders.includes(e.holder.toLowerCase())
+    e => e.balance !== 0n && !excludeHolders.includes(e.holder.toLowerCase())
   );
 
   // now merge the multiple holds into a single hold per holder
@@ -371,56 +353,33 @@ export const getVaultHolders = async (
 
   const excludeHolders = uniq([...strategies, ...tokens]);
 
-  const res = (
-    await Promise.all(
-      getSdksForChain(chainId).map(sdk =>
-        paginate({
-          fetchPage: ({ skip: tokenSkip, first: tokenFirst }) =>
-            paginate({
-              fetchPage: ({ skip, first }) =>
-                sdk.TokenBalance({
-                  tokenSkip,
-                  tokenFirst,
-                  skip,
-                  first,
-                  block: Number(block),
-                  account_not_in: excludeHolders,
-                  amount_gt: balanceGt.toString(),
-                  token_in_1: tokens,
-                  token_in_2: tokens,
-                }),
-              count: res => min(res.data.tokens.map(token => token.balances.length)) ?? 0,
-            }),
-          count: res => min(res.map(chainRes => chainRes.data.tokens.length)) ?? 0,
-        })
-      )
-    )
-  ).flat();
+  const { balances, tokenMetadata } = await getTokenBalancesAtBlock({
+    chainId,
+    targetBlock: block,
+    tokenAddresses: tokens as Hex[],
+    excludeAccounts: excludeHolders as Hex[],
+  });
 
-  return res.flatMap(chainRes =>
-    chainRes.flatMap(tokenPage =>
-      tokenPage.data.tokens.map(token => {
-        if (!token.symbol) {
-          throw new FriendlyError(`Token ${token.id} has no symbol`);
-        }
-        if (!token.decimals) {
-          throw new FriendlyError(`Token ${token.id} has no decimals`);
-        }
-        if (!token.name) {
-          throw new FriendlyError(`Token ${token.id} has no name`);
-        }
-
-        return {
-          id: token.id,
-          name: token.name,
-          symbol: token.symbol,
-          decimals: Number.parseInt(token.decimals, 10),
-          balances: token.balances.map(balance => ({
-            balance: balance.amount,
-            holder: balance.account.id,
-          })),
-        };
-      })
-    )
+  return R.pipe(
+    tokenMetadata,
+    R.map(meta => {
+      if (!meta.symbol) throw new FriendlyError(`Token ${meta.id} has no symbol`);
+      if (!meta.name) throw new FriendlyError(`Token ${meta.id} has no name`);
+      return {
+        id: meta.address.toLowerCase(),
+        name: meta.name,
+        symbol: meta.symbol,
+        decimals: meta.decimals,
+        balances: R.pipe(
+          balances,
+          R.filter(e => e.tokenAddress === meta.address.toLowerCase()),
+          R.filter(e => e.balanceRaw > balanceGt),
+          R.map(e => ({
+            balance: e.balanceRaw.toString(),
+            holder: e.accountAddress,
+          }))
+        ),
+      };
+    })
   );
 };

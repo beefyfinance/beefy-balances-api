@@ -1,9 +1,10 @@
 import { type Static, Type } from '@sinclair/typebox';
 import type { FastifyInstance, FastifyPluginOptions, FastifySchema } from 'fastify';
-import { type ChainId, chainIdAsKeySchema } from '../../config/chains';
+import { chainIdAsKeySchema } from '../../config/chains';
 import { timestampNumberSchema } from '../../schema/bigint';
 import { getAsyncCache } from '../../utils/async-lock';
-import { executeOnAllSdks, sdkContextSchema } from '../../utils/sdk';
+import { getGlobalSdk } from '../../utils/sdk';
+import { getChainIdFromNetworkId } from '../../utils/viemClient';
 
 export default async function (
   instance: FastifyInstance,
@@ -33,31 +34,38 @@ export default async function (
 }
 
 const endpointStatusSchema = Type.Object({
-  subgraph: sdkContextSchema.properties.subgraph,
-  tag: sdkContextSchema.properties.tag,
+  subgraph: Type.String(),
+  tag: Type.String(),
   blockNumber: Type.Union([Type.Number(), Type.Null()]),
   timestamp: Type.Union([timestampNumberSchema, Type.Null()]),
   hasErrors: Type.Boolean(),
 });
-type EndpointStatus = Static<typeof endpointStatusSchema>;
 
 const statusSchema = Type.Record(chainIdAsKeySchema, Type.Array(endpointStatusSchema));
 type Status = Static<typeof statusSchema>;
 
 async function getStatus(): Promise<Status> {
-  const res = await executeOnAllSdks(sdk => sdk.Status());
+  const res = await getGlobalSdk().Status();
+  const metaList = res.data?._meta ?? [];
 
-  return res.results
-    .map((res): EndpointStatus & { chain: ChainId } => ({
-      chain: res.chain,
-      subgraph: res.subgraph,
-      tag: res.tag,
-      blockNumber: res.data._meta?.block.number || null,
-      timestamp: res.data._meta?.block.timestamp || null,
-      hasErrors: res.data._meta?.hasIndexingErrors || false,
-    }))
-    .reduce((acc, { chain, ...rest }) => {
-      acc[chain] = [...(acc[chain] || []), rest];
+  return metaList.reduce(
+    (acc: Status, meta: { networkId?: number | null; progressBlock?: number | null }) => {
+      const networkId = meta.networkId;
+      if (networkId == null) return acc;
+      const chain = getChainIdFromNetworkId(networkId);
+      if (chain == null) return acc;
+      acc[chain] = [
+        ...(acc[chain] ?? []),
+        {
+          subgraph: 'envio',
+          tag: 'latest',
+          blockNumber: meta.progressBlock ?? null,
+          timestamp: null,
+          hasErrors: false,
+        },
+      ];
       return acc;
-    }, {} as Status);
+    },
+    {} as Status
+  );
 }

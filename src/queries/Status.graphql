@@ -1,9 +1,7 @@
 query Status {
   _meta {
-    block {
-      number
-      timestamp
-    }
-    hasIndexingErrors
+    networkId: chainId
+    bufferBlock
+    progressBlock
   }
 }
