@@ -1,5 +1,4 @@
 import { type Static, Type } from '@sinclair/typebox';
-import { Decimal } from 'decimal.js';
 import { groupBy, uniq } from 'lodash';
 import * as R from 'remeda';
 import type { Hex } from 'viem';
@@ -9,7 +8,6 @@ import {
   type BeefyVault,
   getBeefyBreakdownableVaultConfig,
 } from '../vault-breakdown/vault/getBeefyVaultConfig';
-import { decimalToBigInt } from './decimal';
 import { FriendlyError } from './error';
 import { getTokenBalancesAtBlock } from './token-balance-at-block';
 
@@ -24,12 +22,6 @@ export const tokenBalancesSchema = Type.Object({
 
 export const vaultHoldersSchema = Type.Array(tokenBalancesSchema);
 export type VaultHolders = Static<typeof vaultHoldersSchema>;
-
-type HolderWithDetails = {
-  holder: string;
-  balance: string | bigint;
-  hold_details: Array<{ token: Hex; balance: string }>;
-};
 
 export const getVaultHoldersAsBaseVaultEquivalentForVaultAddress = async (
   chainId: ChainId,
@@ -127,7 +119,7 @@ const _getVaultHoldersAsBaseVaultEquivalent = async (
     chainId,
     targetBlock: block,
     tokenAddresses: tokens as Hex[],
-    excludeAccounts: ['0x0000000000000000000000000000000000000000'],
+    excludeAccounts: [],
   });
 
   const balancesByContract = R.pipe(
@@ -145,7 +137,24 @@ const _getVaultHoldersAsBaseVaultEquivalent = async (
             balance: e.balanceRaw,
             // balanceDecimal: e.balanceDecimal,
             holder: e.accountAddress,
-          }))
+          })),
+          R.filter(
+            e =>
+              config.protocol_type !== 'beefy_clm_vault' ||
+              e.holder !== config.beefy_clm_manager.strategy_address.toLowerCase()
+          ),
+          R.filter(
+            e =>
+              config.protocol_type !== 'beefy_clm_vault' ||
+              meta.address !== config.beefy_clm_manager.vault_address ||
+              config.strategy_address.toLowerCase() !== e.holder
+          ),
+          R.filter(
+            e =>
+              config.protocol_type !== 'beefy_clm_vault' ||
+              e.holder !== config.vault_address.toLowerCase()
+          )
+          //R.filter(e => config.protocol_type === 'beefy_clm_vault' || e.holder !== config.beefy_clm_manager.strategy_address.toLowerCase()),
         ),
       };
     }),

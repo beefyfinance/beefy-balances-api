@@ -1,27 +1,24 @@
 query ContractBalance(
   $token_in: [String!]!
   $account_not_in: [String!]!
-  $tokenLimit: Int = 1000
-  $tokenOffset: Int = 0
   $limit: Int = 1000
   $offset: Int = 0
-  $orderBy: TokenBalance_order_by = { id: desc }
 ) {
-  Token(
-    limit: $tokenLimit
-    offset: $tokenOffset
-    where: { id: { _in: $token_in } }
-  ) {
+  
+  Token(where: { id: { _in: $token_in } }) {
     id
     address
     name
     decimals
     symbol
     balances(
-      order_by: [$orderBy]
+      order_by: { amount: desc }
       limit: $limit
       offset: $offset
-      where: { amount: { _gt: 0 }, account_id: { _nin: $account_not_in } }
+      where: { 
+        amount: { _gt: 0 }, 
+        account_id: { _nin: $account_not_in } 
+      }
     ) {
       account_id
       amount

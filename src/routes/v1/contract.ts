@@ -4,7 +4,6 @@ import type { FastifyInstance, FastifyPluginOptions, FastifySchema } from 'fasti
 import * as R from 'remeda';
 import type { Hex } from 'viem';
 import { type ChainId, chainIdSchema } from '../../config/chains';
-import { Order_By } from '../../queries/codegen/sdk';
 import { addressSchema } from '../../schema/address';
 import { bigintSchema } from '../../schema/bigint';
 import { getAsyncCache } from '../../utils/async-lock';
@@ -13,6 +12,7 @@ import { FriendlyError } from '../../utils/error';
 import { getGlobalSdk, paginate } from '../../utils/sdk';
 import { getAccountId, getTokenId } from '../../utils/subgraph-ids';
 import { getTokenBalancesAtBlock } from '../../utils/token-balance-at-block';
+import { getNetworkIdFromChainId } from '../../utils/viemClient';
 
 export default async function (
   instance: FastifyInstance,
@@ -181,18 +181,61 @@ const getTopContractHolders = async (
     getAccountId({ chainId, address: '0x0000000000000000000000000000000000000000' as Hex }),
   ];
   const sdk = getGlobalSdk();
+
+  const countPerToken = R.pipe(
+    tokenIn,
+    R.map(token => [token, 0] as [string, number]),
+    R.fromEntries()
+  );
+
+  const pageSize = 1000;
+  let shouldStop = false;
   const merged = await paginate({
-    fetchPage: ({ offset, limit: pageSize }) =>
-      sdk.ContractBalance({
+    pageSize,
+    fetchPage: async ({ limit, offset }) => {
+      const res = await sdk.ContractBalance({
         token_in: tokenIn,
         account_not_in: accountNotIn,
-        tokenOffset: offset,
-        tokenLimit: pageSize,
-        offset: 0,
+        offset,
         limit,
-        orderBy: { amount: Order_By.Desc },
-      }),
-    count: res => res.data.Token.length,
+      });
+
+      // this fetch counts
+      const pageCountPerToken = R.pipe(
+        res.data.Token,
+        R.map(
+          // make sure to count only holders with balance > 0
+          token => [token.id, token.balances.filter(b => Number(b.amount) > 0).length] as const
+        ),
+        R.fromEntries()
+      );
+
+      // cross-fetch aggregate
+      R.pipe(
+        pageCountPerToken,
+        R.entries(),
+        R.forEach(([token, count]) => {
+          countPerToken[token] += count;
+        })
+      );
+
+      shouldStop =
+        // all tokens have enough holders
+        R.pipe(
+          countPerToken,
+          R.values(),
+          R.reduce((acc, count) => acc && count >= limit, true)
+        ) ||
+        // we have have fetched all holders for all tokens
+        R.pipe(
+          pageCountPerToken,
+          R.values(),
+          R.reduce((acc, count) => acc && count < pageSize, true)
+        );
+
+      return res;
+    },
+    count: () => (shouldStop ? 0 : pageSize),
     merge: (a, b) => ({
       ...a,
       data: {
@@ -212,15 +255,21 @@ const getTopContractHolders = async (
         name: token.name,
         symbol: token.symbol,
         decimals: token.decimals,
-        balances: token.balances.map(balance => {
-          const amount = new Decimal(balance.amount);
-          const rawAmount = decimalToBigInt(amount, token.decimals);
-          return {
-            balance: balance.amount,
-            rawAmount: rawAmount.toString(),
-            holder: balance.account_id,
-          };
-        }),
+        balances: R.pipe(
+          token.balances,
+          R.map(balance => {
+            const amount = new Decimal(balance.amount);
+            const rawAmount = decimalToBigInt(amount, token.decimals);
+            return {
+              balance: balance.amount,
+              rawAmount: rawAmount.toString(),
+              holder: balance.account_id,
+            };
+          }),
+          R.filter(balance => Number(balance.balance) > 0),
+          R.sort(balance => Number(balance.balance)),
+          R.take(limit)
+        ),
       };
     })
   );
