@@ -1,0 +1,17 @@
+query TokenMetadata(
+  $token_in: [String!]!
+  $tokenLimit: Int = 1000
+  $tokenOffset: Int = 0
+) {
+  Token(
+    limit: $tokenLimit
+    offset: $tokenOffset
+    where: { id: { _in: $token_in } }
+  ) {
+    id
+    address
+    name
+    decimals
+    symbol
+  }
+}

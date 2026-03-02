@@ -1,14 +1,18 @@
 import { type Static, Type } from '@sinclair/typebox';
+import Decimal from 'decimal.js';
 import type { FastifyInstance, FastifyPluginOptions, FastifySchema } from 'fastify';
-import { min } from 'lodash';
+import * as R from 'remeda';
 import type { Hex } from 'viem';
 import { type ChainId, chainIdSchema } from '../../config/chains';
-import { OrderDirection, TokenBalance_OrderBy } from '../../queries/codegen/sdk';
 import { addressSchema } from '../../schema/address';
 import { bigintSchema } from '../../schema/bigint';
 import { getAsyncCache } from '../../utils/async-lock';
+import { decimalToBigInt } from '../../utils/decimal';
 import { FriendlyError } from '../../utils/error';
-import { getSdksForChain, paginate } from '../../utils/sdk';
+import { getGlobalSdk, paginate } from '../../utils/sdk';
+import { getAccountId, getTokenId } from '../../utils/subgraph-ids';
+import { getTokenBalancesAtBlock } from '../../utils/token-balance-at-block';
+import { getNetworkIdFromChainId } from '../../utils/viemClient';
 
 export default async function (
   instance: FastifyInstance,
@@ -132,57 +136,38 @@ const getContractHolders = async (
   contract_address: Hex,
   block: bigint
 ): Promise<ContractHolders> => {
-  const res = (
-    await Promise.all(
-      getSdksForChain(chainId).map(sdk =>
-        paginate({
-          fetchPage: ({ skip: tokenSkip, first: tokenFirst }) =>
-            paginate({
-              fetchPage: ({ skip, first }) =>
-                sdk.TokenBalance({
-                  tokenSkip,
-                  tokenFirst,
-                  skip,
-                  first,
-                  block: Number(block),
-                  account_not_in: ['0x0000000000000000000000000000000000000000'], // empty list returns nothing
-                  amount_gt: '0',
-                  token_in_1: [contract_address],
-                  token_in_2: [contract_address],
-                }),
-              count: res => min(res.data.tokens.map(token => token.balances.length)) ?? 0,
-            }),
-          count: res => min(res.map(chainRes => chainRes.data.tokens.length)) ?? 0,
-        })
-      )
-    )
-  ).flat();
+  const excludeAccounts = ['0x0000000000000000000000000000000000000000'] as Hex[];
+  const { balances, tokenMetadata } = await getTokenBalancesAtBlock({
+    chainId,
+    targetBlock: block,
+    tokenAddresses: [contract_address],
+    excludeAccounts,
+  });
 
-  return res.flatMap(chainRes =>
-    chainRes.flatMap(tokenPage =>
-      tokenPage.data.tokens.map(token => {
-        if (!token.symbol) {
-          throw new FriendlyError(`Token ${token.id} has no symbol`);
-        }
-        if (!token.decimals) {
-          throw new FriendlyError(`Token ${token.id} has no decimals`);
-        }
-        if (!token.name) {
-          throw new FriendlyError(`Token ${token.id} has no name`);
-        }
+  if (tokenMetadata.length === 0) return [];
 
-        return {
-          id: token.id,
-          name: token.name,
-          symbol: token.symbol,
-          decimals: Number.parseInt(token.decimals, 10),
-          balances: token.balances.map(balance => ({
-            balance: balance.amount,
-            holder: balance.account.id,
-          })),
-        };
-      })
-    )
+  return R.pipe(
+    tokenMetadata,
+    R.map(meta => {
+      if (!meta.symbol) throw new FriendlyError(`Token ${meta.id} has no symbol`);
+      if (!meta.name) throw new FriendlyError(`Token ${meta.id} has no name`);
+
+      return {
+        id: meta.address.toLowerCase(),
+        name: meta.name,
+        symbol: meta.symbol,
+        decimals: meta.decimals,
+        balances: R.pipe(
+          balances,
+          R.filter(e => e.tokenAddress === meta.address.toLowerCase()),
+          R.filter(e => e.balanceRaw > 0n),
+          R.map(e => ({
+            balance: e.balanceRaw.toString(),
+            holder: e.accountAddress,
+          }))
+        ),
+      };
+    })
   );
 };
 
@@ -191,49 +176,100 @@ const getTopContractHolders = async (
   contract_addresses: Hex[],
   limit: number
 ) => {
-  const res = (
-    await Promise.all(
-      getSdksForChain(chainId).map(sdk =>
-        paginate({
-          fetchPage: ({ skip: tokenSkip, first: tokenFirst }) =>
-            sdk.ContractBalance({
-              tokenSkip,
-              tokenFirst,
-              skip: 0,
-              first: limit,
-              account_not_in: ['0x0000000000000000000000000000000000000000'], // providing an empty account_not_in will return 0 holders
-              token_in_1: contract_addresses,
-              token_in_2: contract_addresses,
-              orderBy: TokenBalance_OrderBy.Amount,
-              orderDirection: OrderDirection.Desc,
-            }),
-          count: res => res.data.tokens.length,
+  const tokenIn = contract_addresses.map(a => getTokenId({ chainId, address: a }));
+  const accountNotIn = [
+    getAccountId({ chainId, address: '0x0000000000000000000000000000000000000000' as Hex }),
+  ];
+  const sdk = getGlobalSdk();
+
+  const countPerToken = R.pipe(
+    tokenIn,
+    R.map(token => [token, 0] as [string, number]),
+    R.fromEntries()
+  );
+
+  const pageSize = 1000;
+  let shouldStop = false;
+  const merged = await paginate({
+    pageSize,
+    fetchPage: async ({ limit, offset }) => {
+      const res = await sdk.ContractBalance({
+        token_in: tokenIn,
+        account_not_in: accountNotIn,
+        offset,
+        limit,
+      });
+
+      // this fetch counts
+      const pageCountPerToken = R.pipe(
+        res.data.Token,
+        R.map(
+          // make sure to count only holders with balance > 0
+          token => [token.id, token.balances.filter(b => Number(b.amount) > 0).length] as const
+        ),
+        R.fromEntries()
+      );
+
+      // cross-fetch aggregate
+      R.pipe(
+        pageCountPerToken,
+        R.entries(),
+        R.forEach(([token, count]) => {
+          countPerToken[token] += count;
         })
-      )
-    )
-  ).flat();
+      );
 
-  return res.flatMap(chainRes =>
-    chainRes.data.tokens.map(token => {
-      if (!token.symbol) {
-        throw new FriendlyError(`Token ${token.id} has no symbol`);
-      }
-      if (!token.decimals) {
-        throw new FriendlyError(`Token ${token.id} has no decimals`);
-      }
-      if (!token.name) {
-        throw new FriendlyError(`Token ${token.id} has no name`);
-      }
+      shouldStop =
+        // all tokens have enough holders
+        R.pipe(
+          countPerToken,
+          R.values(),
+          R.reduce((acc, count) => acc && count >= limit, true)
+        ) ||
+        // we have have fetched all holders for all tokens
+        R.pipe(
+          pageCountPerToken,
+          R.values(),
+          R.reduce((acc, count) => acc && count < pageSize, true)
+        );
 
+      return res;
+    },
+    count: () => (shouldStop ? 0 : pageSize),
+    merge: (a, b) => ({
+      ...a,
+      data: {
+        ...a.data,
+        Token: [...(a.data?.Token ?? []), ...(b.data?.Token ?? [])],
+      },
+    }),
+  });
+
+  return R.pipe(
+    merged.data?.Token ?? [],
+    R.map(token => {
+      if (!token.symbol) throw new FriendlyError(`Token ${token.id} has no symbol`);
+      if (!token.name) throw new FriendlyError(`Token ${token.id} has no name`);
       return {
-        id: token.id,
+        id: token.address.toLowerCase(),
         name: token.name,
         symbol: token.symbol,
-        decimals: Number.parseInt(token.decimals, 10),
-        balances: token.balances.map(balance => ({
-          rawAmount: balance.rawAmount,
-          holder: balance.account.id,
-        })),
+        decimals: token.decimals,
+        balances: R.pipe(
+          token.balances,
+          R.map(balance => {
+            const amount = new Decimal(balance.amount);
+            const rawAmount = decimalToBigInt(amount, token.decimals);
+            return {
+              balance: balance.amount,
+              rawAmount: rawAmount.toString(),
+              holder: balance.account_id,
+            };
+          }),
+          R.filter(balance => Number(balance.balance) > 0),
+          R.sort(balance => Number(balance.balance)),
+          R.take(limit)
+        ),
       };
     })
   );

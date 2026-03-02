@@ -1,8 +1,8 @@
 import type { CodegenConfig } from '@graphql-codegen/cli';
-import { SUBGRAPH_TAG } from '../../config/env';
+import { SUBGRAPH_URL } from '../../config/env';
 
 const config: CodegenConfig = {
-  schema: `https://api.goldsky.com/api/public/project_clu2walwem1qm01w40v3yhw1f/subgraphs/beefy-balances-mode/${SUBGRAPH_TAG}/gn`,
+  schema: SUBGRAPH_URL,
   documents: ['src/queries/*.graphql'],
   generates: {
     'src/queries/codegen/sdk.ts': {
@@ -19,6 +19,10 @@ const config: CodegenConfig = {
           BigDecimal: 'string', // not used by our schema
           Int8: 'string', // not used by our schema
           Timestamp: 'string', // not used by our schema
+          initializablestatus: "'INITIALIZING' | 'INITIALIZED'",
+          jsonb: 'Record<string, unknown>',
+          numeric: 'string',
+          timestamptz: 'string',
         },
       },
     },
