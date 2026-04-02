@@ -1,3 +1,4 @@
+import * as R from 'remeda';
 import { http, type Chain as ViemChain, createPublicClient } from 'viem';
 import { defineChain } from 'viem';
 import {
@@ -96,3 +97,21 @@ export const getViemClient = createCachedFactoryByChainId(chainId => {
   });
 });
 export type BeefyViemClient = ReturnType<typeof getViemClient>;
+
+/**
+ * Map a numeric network id (e.g. 1 for Ethereum, 42161 for Arbitrum) to our ChainId enum.
+ */
+export function getChainIdFromNetworkId(numeric: number): ChainId | null {
+  return (
+    R.pipe(
+      Object.entries(mapping),
+      R.filter(([_, chain]) => chain.id === numeric),
+      R.map(([chainId]) => chainId as ChainId),
+      R.first()
+    ) ?? null
+  );
+}
+
+export function getNetworkIdFromChainId(chainId: ChainId): number {
+  return mapping[chainId].id;
+}

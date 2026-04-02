@@ -1,0 +1,46 @@
+query BalanceAtBlock(
+  $networkId: Int!
+  $tokenId_in: [String!]!
+  $account_not_in: [String!]!
+  $block: numeric!
+  $limit: Int = 1000
+  $offset: Int = 0
+) {
+  _meta(where: { chainId: { _eq: $networkId } }) {
+    networkId: chainId
+    bufferBlock
+    progressBlock
+  }
+  Token(where: { id: { _in: $tokenId_in } }) {
+    id
+    address
+    name
+    decimals
+    symbol
+  }
+  TokenBalance(
+    where: {
+      chainId: { _eq: $networkId }
+      token_id: { _in: $tokenId_in }
+      account_id: { _nin: $account_not_in }
+    }
+    limit: $limit
+    offset: $offset
+    order_by: { id: asc }
+  ) {
+    account {
+      address
+    }
+    token {
+      address
+    }
+    lastChange: changes(
+      where: { blockNumber: { _lte: $block } }
+      limit: 1
+      offset: 0
+      order_by: { blockNumber: desc }
+    ) {
+      balanceAfter
+    }
+  }
+}

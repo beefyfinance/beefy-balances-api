@@ -1,10 +1,15 @@
 import { type Static, Type } from '@sinclair/typebox';
+import Decimal from 'decimal.js';
 import type { FastifyInstance, FastifyPluginOptions, FastifySchema } from 'fastify';
+import * as R from 'remeda';
 import { chainIdSchema } from '../../config/chains';
+import type { AccountLatestBalanceQuery, AllTokenHoldersQuery } from '../../queries/codegen/sdk';
 import { addressSchema } from '../../schema/address';
 import { getAsyncCache } from '../../utils/async-lock';
-import { interpretAsDecimal } from '../../utils/decimal';
-import { getAllSdks, paginate } from '../../utils/sdk';
+import { decimalToBigInt, interpretAsDecimal } from '../../utils/decimal';
+import { FriendlyError } from '../../utils/error';
+import { getGlobalSdk, paginate } from '../../utils/sdk';
+import { getChainIdFromNetworkId } from '../../utils/viemClient';
 
 // Types
 const holderCountSchema = Type.Object({
@@ -40,81 +45,119 @@ const chainDataSchema = Type.Object({
 
 type ChainData = Static<typeof chainDataSchema>;
 
+type AllTokenHoldersResponse = { data: AllTokenHoldersQuery };
+
 // Business Logic
 const getHolderCount = async (): Promise<Array<HolderCount>> => {
-  const res = (
-    await Promise.all(
-      getAllSdks().map(sdk =>
-        paginate({
-          fetchPage: ({ skip, first }) =>
-            sdk.AllTokenHolders({
-              skip,
-              first,
-            }),
-          count: res => res.data.tokenStatistics.length,
-        })
-      )
-    )
-  ).flat();
+  const sdk = getGlobalSdk();
+  const merged = await paginate<AllTokenHoldersResponse>({
+    fetchPage: ({ offset, limit }) => sdk.AllTokenHolders({ offset, limit }),
+    count: res => res.data.Token.length,
+    merge: (a, b) => ({
+      ...a,
+      data: {
+        ...a.data,
+        Token: [...(a.data?.Token ?? []), ...(b.data?.Token ?? [])],
+      },
+    }),
+  });
 
-  return res.flatMap(chainRes =>
-    chainRes.data.tokenStatistics.map(stat => ({
-      chain: chainRes.chain,
-      token_address: stat.id,
-      holder_count: Number.parseInt(stat.holderCount, 10),
-    }))
+  return R.pipe(
+    merged.data?.Token ?? [],
+    R.map(token => ({
+      chain: getChainIdFromNetworkId(token.networkId),
+      token_address: token.address,
+      holder_count: Number(token.holderCount),
+    })),
+    R.filter((row): row is HolderCount => row.chain != null)
   );
 };
 
+type AccountLatestBalanceResponse = { data: AccountLatestBalanceQuery };
+
 const getLatestBalances = async (address: string): Promise<ChainData[]> => {
-  const res = (
-    await Promise.all(
-      getAllSdks().map(sdk =>
-        paginate({
-          fetchPage: ({ skip: pageSkip, first: pageFirst }) =>
-            sdk.AccountLatestBalance({
-              address,
-              skip: pageSkip,
-              first: pageFirst,
-            }),
-          count: res => res.data.account?.balances.length ?? 0,
-        })
-      )
+  const sdk = getGlobalSdk();
+  const merged = await paginate<AccountLatestBalanceResponse>({
+    fetchPage: ({ offset, limit }) =>
+      sdk.AccountLatestBalance({
+        address: address.toLowerCase(),
+        offset,
+        limit,
+      }),
+    count: res => res.data.Account_by_pk?.balances.length ?? 0,
+    merge: (a, b) => ({
+      ...a,
+      data: {
+        _meta: a.data._meta, // only keep the first meta
+        Account_by_pk: a.data.Account_by_pk
+          ? {
+              ...a.data.Account_by_pk,
+              balances: [
+                ...(a.data.Account_by_pk.balances ?? []),
+                ...(b.data?.Account_by_pk?.balances ?? []),
+              ],
+            }
+          : b.data?.Account_by_pk
+            ? { ...b.data.Account_by_pk, balances: b.data.Account_by_pk.balances ?? [] }
+            : null,
+      },
+    }),
+  });
+
+  if (!merged.data?.Account_by_pk) return [];
+
+  const account = merged.data.Account_by_pk;
+  const blockByNetworkId = R.pipe(
+    merged.data._meta ?? [],
+    R.map(meta => ({
+      networkId: meta.networkId ?? 0,
+      number: meta.progressBlock ?? 0,
+      timestamp: meta.readyAt ? new Date(meta.readyAt).getTime() : 0,
+    })),
+    R.indexBy(b => b.networkId)
+  );
+
+  const balancesWithChain = (account.balances ?? [])
+    .filter(
+      (balance): balance is typeof balance & { token: NonNullable<typeof balance.token> } =>
+        balance.token != null
     )
-  ).flat();
-
-  const chains = res.flatMap(chainRes => {
-    if (!chainRes.data.account || !chainRes.data._meta) return [];
-
-    const balances = chainRes.data.account.balances.map(balance => {
-      const decimals = Number.parseInt(balance.token.decimals);
-      const amount = interpretAsDecimal(balance.rawAmount, decimals).toString();
-
+    .map(balance => {
+      const decimals = Number(balance.token.decimals);
+      const amount = new Decimal(balance.amount);
       return {
+        networkId: balance.networkId,
         token: {
-          address: balance.token.id,
+          address: balance.token.address,
           symbol: balance.token.symbol ?? '',
           name: balance.token.name ?? '',
           decimals,
         },
-        amount,
-        rawAmount: balance.rawAmount,
+        amount: amount.toString(),
+        rawAmount: decimalToBigInt(amount, decimals).toString(),
       };
     });
 
-    return [
-      {
-        chain: chainRes.chain,
-        block: {
-          number: chainRes.data._meta.block.number ?? 0,
-          timestamp: chainRes.data._meta.block.timestamp ?? 0,
-        },
-        balances,
-      },
-    ];
-  });
+  const byChain = R.groupBy(balancesWithChain, b => String(b.networkId));
 
-  return chains;
+  return R.pipe(
+    Object.entries(byChain),
+    R.flatMap(([networkId, chainBalances]) => {
+      const block = blockByNetworkId[Number(networkId)];
+      if (!block) throw new FriendlyError(`Block not found for network ${networkId}`);
+      const chain = getChainIdFromNetworkId(Number(networkId));
+      if (!chain) throw new FriendlyError(`Chain not found for network ${networkId}`);
+      return {
+        chain,
+        block: block,
+        balances: chainBalances.map(({ token, amount, rawAmount }) => ({
+          token,
+          amount,
+          rawAmount,
+        })),
+      };
+    })
+  );
 };
 
 // Route Handler

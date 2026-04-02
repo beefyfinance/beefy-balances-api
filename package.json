@@ -24,7 +24,8 @@
     "postinstall": "npm --silent run codegen",
     "codegen": "graphql-codegen --config ./src/queries/codegen/codegen.ts",
     "update:addressbook": "ncu --upgrade @beefyfinance/blockchain-addressbook viem && npm install",
-    "lint-staged": "lint-staged"
+    "lint-staged": "lint-staged",
+    "compare:api": "ts-node --transpile-only scripts/compare-api.ts"
   },
   "dependencies": {
     "@beefyfinance/blockchain-addressbook": "^0.54.168",
@@ -48,6 +49,7 @@
     "lodash": "^4.17.21",
     "node-cache": "^5.1.2",
     "pino": "^8.19.0",
+    "remeda": "^2.21.0",
     "viem": "^2.45.2"
   },
   "lint-staged": {
@@ -72,5 +74,6 @@
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.4.5"
-  }
+  },
+  "packageManager": "npm@10.2.3"
 }
