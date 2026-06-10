@@ -12,10 +12,10 @@ export default async function (
   done: (err?: Error) => void
 ) {
   instance.register(status, { prefix: '/status' });
-  instance.register(holders, { prefix: '/holders' });
+  // instance.register(holders, { prefix: '/holders' });
   instance.register(vault, { prefix: '/vault' });
   instance.register(config, { prefix: '/config' });
   instance.register(contract, { prefix: '/contract' });
-  instance.register(partner, { prefix: '/partner' });
+  // instance.register(partner, { prefix: '/partner' });
   done();
 }
