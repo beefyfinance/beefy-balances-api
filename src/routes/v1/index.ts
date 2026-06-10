@@ -1,8 +1,8 @@
 import type { FastifyInstance, FastifyPluginOptions } from 'fastify';
 import config from './config';
 import contract from './contract';
-import holders from './holders';
-import partner from './partner';
+// import holders from './holders';
+// import partner from './partner';
 import status from './status';
 import vault from './vault';
 
