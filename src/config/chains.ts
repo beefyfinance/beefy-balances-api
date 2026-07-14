@@ -23,6 +23,7 @@ export enum ChainId {
   optimism = 'optimism',
   plasma = 'plasma',
   polygon = 'polygon',
+  robinhood = 'robinhood',
   rootstock = 'rootstock',
   scroll = 'scroll',
   saga = 'saga',

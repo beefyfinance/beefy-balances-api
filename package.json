@@ -9,9 +9,7 @@
     "start": "node build/index.js",
     "inspect": "node --inspect build/index.js",
     "dev": "ts-node-dev --respawn --require=dotenv/config src/index.ts",
-    "format": "biome check",
-    "format:fix": "biome check --write",
-    "format:fix:unsafe": "biome check --write --unsafe",
+    "format": "biome check --write --unsafe",
     "test": "pnpm run test:ts && pnpm run test:unit && pnpm run test:lint",
     "test:unit": "jest --passWithNoTests",
     "test:ts": "tsc --noEmit",
@@ -24,7 +22,7 @@
     "lint-staged": "lint-staged"
   },
   "dependencies": {
-    "@beefyfinance/blockchain-addressbook": "^0.54.168",
+    "@beefyfinance/blockchain-addressbook": "^0.56.1",
     "@fastify/caching": "^8.3.0",
     "@fastify/cors": "^9.0.1",
     "@fastify/etag": "^5.1.0",
@@ -45,7 +43,7 @@
     "lodash": "^4.18.1",
     "node-cache": "^5.1.2",
     "pino": "^8.19.0",
-    "viem": "^2.45.2"
+    "viem": "^2.55.2"
   },
   "lint-staged": {
     "src/**/*.{ts,json}": "biome check --write"

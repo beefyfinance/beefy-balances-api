@@ -5,7 +5,8 @@ allowBuilds:
 ignoredBuiltDependencies: []
 
 minimumReleaseAge: 10080 # 7 days in minutes
-minimumReleaseAgeExclude: []
+minimumReleaseAgeExclude:
+  ["@beefyfinance/blockchain-addressbook@0.56.1", viem@2.55.2]
 
 onlyBuiltDependencies:
   - "@biomejs/biome"
