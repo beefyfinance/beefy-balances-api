@@ -6,8 +6,6 @@ import {
   base,
   bsc,
   fraxtal,
-  gnosis,
-  linea,
   mainnet,
   megaeth,
   monad,
@@ -17,7 +15,6 @@ import {
   robinhood,
   rootstock,
   sonic,
-  zksync,
 } from 'viem/chains';
 import type { ChainId } from '../config/chains';
 import { createCachedFactoryByChainId } from './factory';
@@ -54,9 +51,7 @@ const mapping: Record<ChainId, ViemChain> = {
   bsc: bsc,
   ethereum: mainnet,
   fraxtal: fraxtal,
-  gnosis: gnosis,
   hyperevm: hyperevm,
-  linea: linea,
   megaeth: megaeth,
   monad: monad,
   optimism: optimism,
@@ -65,7 +60,6 @@ const mapping: Record<ChainId, ViemChain> = {
   robinhood: robinhood,
   rootstock: rootstock,
   sonic: sonic,
-  zksync: zksync,
 };
 
 export const getViemClient = createCachedFactoryByChainId(chainId => {
