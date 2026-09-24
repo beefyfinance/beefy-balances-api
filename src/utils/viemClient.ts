@@ -14,7 +14,6 @@ import {
   plasma,
   polygon,
   robinhood,
-  rootstock,
   sonic,
 } from 'viem/chains';
 import type { ChainId } from '../config/chains';
@@ -60,7 +59,6 @@ const mapping: Record<ChainId, ViemChain> = {
   plasma: plasma,
   polygon: polygon,
   robinhood: robinhood,
-  rootstock: rootstock,
   sonic: sonic,
 };
 

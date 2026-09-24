@@ -16,7 +16,6 @@ export enum ChainId {
   plasma = 'plasma',
   polygon = 'polygon',
   robinhood = 'robinhood',
-  rootstock = 'rootstock',
   sonic = 'sonic',
 }
 
