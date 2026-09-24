@@ -9,7 +9,7 @@ Access api for the CLM subgraph: https://github.com/beefyfinance/beefy-balances-
 - `pnpm run update:addressbook` 
 - update `src/utils/viemClient.ts`
 - `pnpm run test:ts` and fix errs
-- `pnpm run format:fix`
+- `pnpm run format`
 - `pnpm run dev` 
     - http://localhost:4000/api/v1/status
     - http://localhost:4000/api/v1/config/:chain/vaults

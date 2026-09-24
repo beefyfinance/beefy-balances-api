@@ -2,6 +2,7 @@ import { http, type Chain as ViemChain, createPublicClient } from 'viem';
 import { defineChain } from 'viem';
 import {
   arbitrum,
+  arc,
   avalanche,
   base,
   bsc,
@@ -46,6 +47,7 @@ const hyperevm = defineChain({
 
 const mapping: Record<ChainId, ViemChain> = {
   arbitrum: arbitrum,
+  arc: arc,
   avax: avalanche,
   base: base,
   bsc: bsc,

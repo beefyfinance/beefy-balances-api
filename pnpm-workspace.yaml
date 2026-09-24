@@ -6,7 +6,7 @@ ignoredBuiltDependencies: []
 
 minimumReleaseAge: 10080 # 7 days in minutes
 minimumReleaseAgeExclude:
-  ["@beefyfinance/blockchain-addressbook@0.56.1", viem@2.55.2]
+  ["@beefyfinance/blockchain-addressbook@0.60.0", "viem@2.56.8"]
 
 onlyBuiltDependencies:
   - "@biomejs/biome"
@@ -14,6 +14,7 @@ onlyBuiltDependencies:
 
 trustPolicy: no-downgrade
 trustPolicyExclude:
+  - "@beefyfinance/blockchain-addressbook@0.60.0"
   - "@graphql-tools/batch-execute@9.0.19"
   - "@graphql-tools/delegate@10.2.23"
   - "@graphql-tools/executor-graphql-ws@2.0.7"
